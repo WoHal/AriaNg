@@ -3,6 +3,10 @@
 
     angular.module('ariaNg').config(['$routeProvider', function ($routeProvider) {
         $routeProvider
+            .when('/m3u8', {
+                templateUrl: 'views/m3u8.html',
+                controller: 'M3U8Controller'
+            })
             .when('/downloading', {
                 templateUrl: 'views/list.html',
                 controller: 'DownloadListController'
