@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('ariaNgMonitorService', ['$filter', '$translate', 'moment', 'ariaNgConstants', function ($filter, $translate, moment, ariaNgConstants) {
+    angular.module('ariaNg').factory('ariaNgMonitorService', ['$filter', 'ariaNgConstants', 'ariaNgCommonService', 'ariaNgLocalizationService', function ($filter, ariaNgConstants, ariaNgCommonService, ariaNgLocalizationService) {
         var currentGlobalStat = {};
         var storagesInMemory = {};
         var globalStorageKey = 'global';
@@ -29,14 +29,14 @@
                     show: true,
                     formatter: function (params) {
                         if (params[0].name === '') {
-                            return '<div>' + $translate.instant('No Data') + '</div>';
+                            return '<div>' + ariaNgLocalizationService.getLocalizedText('No Data') + '</div>';
                         }
 
-                        var time = moment(params[0].name, 'X').format('HH:mm:ss');
+                        var time = ariaNgCommonService.getLongTimeFromUnixTime(params[0].name);
                         var uploadSpeed = $filter('readableVolume')(params[0].value) + '/s';
                         var downloadSpeed = $filter('readableVolume')(params[1].value) + '/s';
 
-                        return '<div>' + time + '</div>'
+                        return '<div><i class="fa fa-clock-o"></i> ' + time + '</div>'
                             + '<div><i class="icon-download fa fa-arrow-down"></i> ' + downloadSpeed +'</div>'
                             + '<div><i class="icon-upload fa fa-arrow-up"></i> ' + uploadSpeed + '</div>';
                     }
@@ -53,7 +53,7 @@
                     type: 'value',
                     axisLabel: {
                         formatter: function (value) {
-                            return $filter('readableVolume')(value, 0);
+                            return $filter('readableVolume')(value, 'auto');
                         }
                     }
                 },
@@ -132,7 +132,7 @@
                     initStorage(key);
                 }
 
-                stat.time = moment().format('X');
+                stat.time = ariaNgCommonService.getCurrentUnixTime();
                 pushToStorage(key, stat);
             },
             getStatsData: function (key) {

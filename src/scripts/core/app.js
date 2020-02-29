@@ -11,14 +11,15 @@
         'pascalprecht.translate',
         'angularMoment',
         'ngWebSocket',
-        'ab-base64',
+        'utf8-base64',
         'LocalStorageModule',
-        'notification',
         'ui-notification',
         'angularBittorrentPeerid',
         'cgBusy',
         'angularPromiseButtons',
         'oitozero.ngSweetAlert',
+        'angular-clipboard',
+        'inputDropdown',
         angularDragula(angular)
     ]);
 }());

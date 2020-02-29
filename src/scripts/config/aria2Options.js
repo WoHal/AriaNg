@@ -10,6 +10,7 @@
         //     [defaultValue: '',]
         //     [required: true|false,] //default: false
         //     [split: '',] //SUPPORT 'text' type
+        //     [submitFormat: 'string|array'] //default: string, parameter 'split' is required
         //     [showCount: true|false,] //SUPPORT 'text' type, parameter 'split' is required, default: false
         //     [options: [],] //SUPPORT 'option' type
         //     [min: 0,] //SUPPORT 'integer', 'float'
@@ -66,7 +67,7 @@
             suffix: 'Bytes',
             defaultValue: '0',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'max-connection-per-server': {
             type: 'integer',
@@ -92,7 +93,7 @@
             suffix: 'Bytes',
             defaultValue: '20M',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'netrc-path': {
             type: 'string',
@@ -228,7 +229,10 @@
             required: true
         },
         'header': {
-            type: 'string'
+            type: 'text',
+            split: '\n',
+            submitFormat: 'array',
+            showCount: true
         },
         'save-cookies': {
             type: 'string'
@@ -316,6 +320,12 @@
             defaultValue: 'true',
             required: true
         },
+        'bt-load-saved-metadata': {
+            since: '1.33.0',
+            type: 'boolean',
+            defaultValue: 'false',
+            required: true
+        },
         'bt-max-open-files': {
             type: 'integer',
             defaultValue: '100',
@@ -357,7 +367,7 @@
             suffix: 'Bytes',
             defaultValue: '50K',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'bt-save-metadata': {
             type: 'boolean',
@@ -455,19 +465,25 @@
             suffix: 'Bytes',
             defaultValue: '0',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'max-upload-limit': {
             type: 'string',
             suffix: 'Bytes',
             defaultValue: '0',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'peer-id-prefix': {
             type: 'string',
             readonly: true,
             defaultValue: 'A2-$MAJOR-$MINOR-$PATCH-'
+        },
+        'peer-agent': {
+            since: '1.33.0',
+            type: 'string',
+            defaultValue: 'aria2/$MAJOR.$MINOR.$PATCH',
+            readonly: true
         },
         'seed-ratio': {
             type: 'float',
@@ -699,7 +715,7 @@
             suffix: 'Bytes',
             defaultValue: '9223372036854775807',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'max-resume-failure-tries': {
             type: 'integer',
@@ -729,7 +745,7 @@
             suffix: 'Bytes',
             defaultValue: '1M',
             required: true,
-            pattern: '^(0|[1-9]\\d*M?)$'
+            pattern: '^(0|[1-9]\\d*(M|m)?)$'
         },
         'show-console-readout': {
             type: 'boolean',
@@ -747,14 +763,14 @@
             suffix: 'Bytes',
             defaultValue: '0',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'max-download-limit': {
             type: 'string',
             suffix: 'Bytes',
             defaultValue: '0',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'no-conf': {
             type: 'boolean',
@@ -765,7 +781,7 @@
             suffix: 'Bytes',
             defaultValue: '5M',
             required: true,
-            pattern: '^(0|[1-9]\\d*(K|M)?)$'
+            pattern: '^(0|[1-9]\\d*(K|k|M|m)?)$'
         },
         'parameterized-uri': {
             type: 'boolean',
@@ -839,13 +855,13 @@
         ],
         btOptions: [
             'bt-detach-seed-only', 'bt-enable-hook-after-hash-check', 'bt-enable-lpd', 'bt-exclude-tracker',
-            'bt-external-ip', 'bt-force-encryption', 'bt-hash-check-seed', 'bt-max-open-files', 'bt-max-peers',
+            'bt-external-ip', 'bt-force-encryption', 'bt-hash-check-seed', 'bt-load-saved-metadata', 'bt-max-open-files', 'bt-max-peers',
             'bt-metadata-only', 'bt-min-crypto-level', 'bt-prioritize-piece', 'bt-remove-unselected-file',
             'bt-require-crypto', 'bt-request-peer-speed-limit', 'bt-save-metadata', 'bt-seed-unverified',
             'bt-stop-timeout', 'bt-tracker', 'bt-tracker-connect-timeout', 'bt-tracker-interval', 'bt-tracker-timeout',
             'dht-file-path', 'dht-file-path6', 'dht-listen-port', 'dht-message-timeout', 'enable-dht', 'enable-dht6',
             'enable-peer-exchange', 'follow-torrent', 'listen-port', 'max-overall-upload-limit', 'max-upload-limit',
-            'peer-id-prefix', 'seed-ratio', 'seed-time'
+            'peer-id-prefix', 'peer-agent', 'seed-ratio', 'seed-time'
         ],
         metalinkOptions: [
             'follow-metalink', 'metalink-base-uri', 'metalink-language', 'metalink-location', 'metalink-os',
@@ -877,12 +893,14 @@
         //     category: 'global|http|bittorrent',
         //     [canShow: 'new|active|waiting|paused',] // possible to show in specific status, supporting multiple choice. if not set, always show
         //     [canUpdate: 'new|active|waiting|paused',] // possible to write in specific status, supporting multiple choice. if not set, always writable
+        //     [showHistory: true|false,] // show history under the input box, only supporting "string" type. if not set, this is set to false
         // }
         taskOptions: [
             {
                 key: 'dir',
                 category: 'global',
-                canUpdate: 'new'
+                canUpdate: 'new',
+                showHistory: true
             },
             {
                 key: 'out',
@@ -928,6 +946,16 @@
                 canUpdate: 'new|waiting|paused'
             },
             {
+                key: 'http-user',
+                category: 'http',
+                canUpdate: 'new|waiting|paused'
+            },
+            {
+                key: 'http-passwd',
+                category: 'http',
+                canUpdate: 'new|waiting|paused'
+            },
+            {
                 key: 'all-proxy',
                 category: 'http',
                 canUpdate: 'new|waiting|paused'
@@ -941,6 +969,11 @@
                 key: 'all-proxy-passwd',
                 category: 'http',
                 canUpdate: 'new|waiting|paused'
+            },
+            {
+                key: 'referer',
+                category: 'http',
+                canUpdate: 'new'
             },
             {
                 key: 'header',

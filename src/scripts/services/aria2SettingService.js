@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('aria2SettingService', ['aria2AllOptions', 'aria2GlobalAvailableOptions', 'aria2QuickSettingsAvailableOptions', 'aria2TaskAvailableOptions', 'aria2RpcService', 'ariaNgLogService', function (aria2AllOptions, aria2GlobalAvailableOptions, aria2QuickSettingsAvailableOptions, aria2TaskAvailableOptions, aria2RpcService, ariaNgLogService) {
+    angular.module('ariaNg').factory('aria2SettingService', ['ariaNgConstants', 'aria2AllOptions', 'aria2GlobalAvailableOptions', 'aria2QuickSettingsAvailableOptions', 'aria2TaskAvailableOptions', 'aria2RpcService', 'ariaNgLogService', 'ariaNgStorageService', function (ariaNgConstants, aria2AllOptions, aria2GlobalAvailableOptions, aria2QuickSettingsAvailableOptions, aria2TaskAvailableOptions, aria2RpcService, ariaNgLogService, ariaNgStorageService) {
         var processStatResult = function (stat) {
             if (!stat) {
                 return stat;
@@ -16,7 +16,16 @@
             return stat;
         };
 
+        var getSettingHistoryKey = function (key) {
+            return ariaNgConstants.settingHistoryKeyPrefix + '.' + key;
+        };
+
         return {
+            isOptionKeyValid: function (key) {
+                var option = aria2AllOptions[key];
+
+                return !!option;
+            },
             getAvailableGlobalOptionsKeys: function (type) {
                 if (type === 'basic') {
                     return aria2GlobalAvailableOptions.basicOptions;
@@ -38,7 +47,7 @@
                     return false;
                 }
             },
-            getaria2QuickSettingsAvailableOptions: function (type) {
+            getAria2QuickSettingsAvailableOptions: function (type) {
                 if (type === 'globalSpeedLimit') {
                     return aria2QuickSettingsAvailableOptions.globalSpeedLimitOptions;
                 } else {
@@ -83,7 +92,8 @@
                     var option = allOptions[i];
                     var optionKey = {
                         key: option.key,
-                        category: option.category
+                        category: option.category,
+                        showHistory: option.showHistory
                     };
 
                     if (option.canShow && option.canShow.indexOf('new') < 0) {
@@ -110,6 +120,7 @@
                     var key = keys[i];
                     var readonly = false;
                     var category = null;
+                    var showHistory = false;
 
                     if (angular.isObject(key)) {
                         var optionKey = key;
@@ -117,6 +128,7 @@
                         key = optionKey.key;
                         readonly = !!optionKey.readonly;
                         category = optionKey.category;
+                        showHistory = !!optionKey.showHistory;
                     }
 
                     var option = aria2AllOptions[key];
@@ -143,6 +155,10 @@
                         option.readonly = true;
                     }
 
+                    if (showHistory) {
+                        option.showHistory = true;
+                    }
+
                     if (extendSettings && extendSettings.disableRequired) {
                         option.required = false;
                     }
@@ -152,7 +168,7 @@
 
                         for (var j = 0; j < option.options.length; j++) {
                             availableOptions.push({
-                                name: 'options.' + option.options[j],
+                                name: 'option.' + option.options[j],
                                 value: option.options[j]
                             });
                         }
@@ -164,6 +180,48 @@
                 }
 
                 return options;
+            },
+            getSettingHistory: function (key) {
+                if (!this.isOptionKeyValid(key)) {
+                    return [];
+                }
+
+                var storageKey = getSettingHistoryKey(key);
+                var history = ariaNgStorageService.get(storageKey) || [];
+                var newHistory = [];
+
+                for (var i = 0; i < Math.min(history.length, ariaNgConstants.historyMaxStoreCount); i++) {
+                    newHistory.push(history[i]);
+                }
+
+                return newHistory;
+            },
+            addSettingHistory: function (key, value) {
+                if (!this.isOptionKeyValid(key)) {
+                    return [];
+                }
+
+                var storageKey = getSettingHistoryKey(key);
+                var history = ariaNgStorageService.get(storageKey) || [];
+                var newHistory = [];
+                newHistory.push(value);
+
+                for (var i = 0; i < Math.min(history.length, ariaNgConstants.historyMaxStoreCount - 1); i++) {
+                    if (history[i] !== value) {
+                        newHistory.push(history[i]);
+                    }
+                }
+
+                ariaNgStorageService.set(storageKey, newHistory);
+
+                return newHistory;
+            },
+            clearSettingsHistorys: function () {
+                var keys = ariaNgStorageService.keys(ariaNgConstants.settingHistoryKeyPrefix + '.');
+
+                for (var i = 0; i < keys.length; i++) {
+                    ariaNgStorageService.remove(keys[i]);
+                }
             },
             getGlobalOption: function (callback, silent) {
                 return aria2RpcService.getGlobalOption({

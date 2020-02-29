@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('ariaNgTitleService', ['$filter', '$translate', 'ariaNgConstants', 'ariaNgSettingService', function ($filter, $translate, ariaNgConstants, ariaNgSettingService) {
+    angular.module('ariaNg').factory('ariaNgTitleService', ['$filter', 'ariaNgConstants', 'ariaNgLocalizationService', 'ariaNgSettingService', function ($filter, ariaNgConstants, ariaNgLocalizationService, ariaNgSettingService) {
         var parseSettings = function (placeholder) {
             if (!placeholder) {
                 return {};
@@ -61,30 +61,36 @@
             return title;
         };
 
+        var replaceCurrentRPCAlias = function (title, value) {
+            return replacePlaceholders(title, 'rpcprofile', {
+                value: value
+            });
+        };
+
         var replaceDownloadingCount = function (title, value) {
             return replacePlaceholders(title, 'downloading', {
-                prefix: $translate.instant('Downloading') + ': ',
+                prefix: ariaNgLocalizationService.getLocalizedText('Downloading') + ': ',
                 value: value
             });
         };
 
         var replaceWaitingCount = function (title, value) {
             return replacePlaceholders(title, 'waiting', {
-                prefix: $translate.instant('Waiting') + ': ',
+                prefix: ariaNgLocalizationService.getLocalizedText('Waiting') + ': ',
                 value: value
             });
         };
 
         var replaceStoppedCount = function (title, value) {
             return replacePlaceholders(title, 'stopped', {
-                prefix: $translate.instant('Finished / Stopped'),
+                prefix: ariaNgLocalizationService.getLocalizedText('Finished / Stopped') + ': ',
                 value: value
             });
         };
 
         var replaceDownloadSpeed = function (title, value) {
             return replacePlaceholders(title, 'downspeed', {
-                prefix: $translate.instant('Download') + ': ',
+                prefix: ariaNgLocalizationService.getLocalizedText('Download') + ': ',
                 value: value,
                 type: 'volume',
                 suffix: '/s'
@@ -93,7 +99,7 @@
 
         var replaceUploadSpeed = function (title, value) {
             return replacePlaceholders(title, 'upspeed', {
-                prefix: $translate.instant('Upload') + ': ',
+                prefix: ariaNgLocalizationService.getLocalizedText('Upload') + ': ',
                 value: value,
                 type: 'volume',
                 suffix: '/s'
@@ -118,6 +124,7 @@
                     uploadSpeed: 0
                 }, context);
 
+                title = replaceCurrentRPCAlias(title, context.currentRPCAlias);
                 title = replaceDownloadingCount(title, context.downloadingCount);
                 title = replaceWaitingCount(title, context.waitingCount);
                 title = replaceStoppedCount(title, context.stoppedCount);
@@ -127,13 +134,14 @@
 
                 return title;
             },
-            getFinalTitleByGlobalStat: function (globalStat) {
+            getFinalTitleByGlobalStat: function (params) {
                 var context = {
-                    downloadingCount: (globalStat ? globalStat.numActive : 0),
-                    waitingCount: (globalStat ? globalStat.numWaiting : 0),
-                    stoppedCount: (globalStat ? globalStat.numStopped : 0),
-                    downloadSpeed: (globalStat ? globalStat.downloadSpeed : 0),
-                    uploadSpeed: (globalStat ? globalStat.uploadSpeed : 0)
+                    currentRPCAlias: (params && params.currentRpcProfile ? (params.currentRpcProfile.rpcAlias || (params.currentRpcProfile.rpcHost + ':' + params.currentRpcProfile.rpcPort)) : ''),
+                    downloadingCount: (params && params.globalStat ? params.globalStat.numActive : 0),
+                    waitingCount: (params && params.globalStat ? params.globalStat.numWaiting : 0),
+                    stoppedCount: (params && params.globalStat ? params.globalStat.numStopped : 0),
+                    downloadSpeed: (params && params.globalStat ? params.globalStat.downloadSpeed : 0),
+                    uploadSpeed: (params && params.globalStat ? params.globalStat.uploadSpeed : 0)
                 };
 
                 return this.getFinalTitle(context);

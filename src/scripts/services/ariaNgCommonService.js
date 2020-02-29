@@ -1,40 +1,47 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('ariaNgCommonService', ['$location', '$timeout', 'base64', 'SweetAlert', '$translate', 'ariaNgConstants', function ($location, $timeout, base64, SweetAlert, $translate, ariaNgConstants) {
+    angular.module('ariaNg').factory('ariaNgCommonService', ['$location', '$timeout', 'base64', 'moment', 'SweetAlert', 'ariaNgConstants', function ($location, $timeout, base64, moment, SweetAlert, ariaNgConstants) {
         return {
+            base64Encode: function (value) {
+                return base64.encode(value);
+            },
+            base64Decode: function (value) {
+                return base64.decode(value);
+            },
+            base64UrlDecode: function (value) {
+                return base64.urldecode(value);
+            },
             generateUniqueId: function () {
                 var sourceId = ariaNgConstants.appPrefix + '_' + Math.round(new Date().getTime() / 1000) + '_' + Math.random();
-                var hashedId = base64.encode(sourceId);
+                var hashedId = this.base64Encode(sourceId);
 
                 return hashedId;
             },
-            showDialog: function (title, text, type) {
+            showDialog: function (title, text, type, callback, options) {
                 $timeout(function () {
                     SweetAlert.swal({
-                        title: $translate.instant(title),
-                        text: $translate.instant(text),
+                        title: title,
+                        text: text,
                         type: type,
-                        confirmButtonText: $translate.instant('OK')
+                        confirmButtonText: options && options.confirmButtonText || null
+                    }, function () {
+                        if (callback) {
+                            callback();
+                        }
                     });
                 }, 100);
             },
-            showError: function (text) {
-                this.showDialog('Error', text, 'error');
-            },
-            showOperationSucceeded: function (text) {
-                this.showDialog('Operation Succeeded', text, 'success');
-            },
             confirm: function (title, text, type, callback, notClose, extendSettings) {
                 var options = {
-                    title: $translate.instant(title),
-                    text: $translate.instant(text, (angular.isObject(extendSettings) ? extendSettings.textParams : null)),
+                    title: title,
+                    text: text,
                     type: type,
                     showCancelButton: true,
                     showLoaderOnConfirm: !!notClose,
                     closeOnConfirm: !notClose,
-                    confirmButtonText: $translate.instant('OK'),
-                    cancelButtonText: $translate.instant('Cancel')
+                    confirmButtonText: extendSettings && extendSettings.confirmButtonText || null,
+                    cancelButtonText: extendSettings && extendSettings.cancelButtonText || null
                 };
 
                 if (type === 'warning') {
@@ -51,12 +58,35 @@
                     }
                 });
             },
+            closeAllDialogs: function () {
+                SweetAlert.close();
+            },
             getFileExtension: function (filePath) {
                 if (!filePath || filePath.lastIndexOf('.') < 0) {
                     return filePath;
                 }
 
                 return filePath.substring(filePath.lastIndexOf('.'));
+            },
+            parseUrlsFromOriginInput: function (s) {
+                if (!s) {
+                    return [];
+                }
+
+                var lines = s.split('\n');
+                var result = [];
+
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+
+                    if (line.match(/^(http|https|ftp|sftp):\/\/.+$/)) {
+                        result.push(line);
+                    } else if (line.match(/^magnet:\?.+$/)) {
+                        result.push(line);
+                    }
+                }
+
+                return result;
             },
             decodePercentEncodedString: function (s) {
                 if (!s) {
@@ -187,6 +217,15 @@
                 });
 
                 return obj;
+            },
+            getCurrentUnixTime: function () {
+                return moment().format('X');
+            },
+            getLongTimeFromUnixTime: function (unixTime) {
+                return moment(unixTime, 'X').format('HH:mm:ss');
+            },
+            formatDateTime: function (datetime, format) {
+                return moment(datetime).format(format);
             },
             getTimeOptions: function (timeList, withDisabled) {
                 var options = [];

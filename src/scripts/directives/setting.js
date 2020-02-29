@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').directive('ngSetting', ['$timeout', '$translate', 'ariaNgConstants', function ($timeout, $translate, ariaNgConstants) {
+    angular.module('ariaNg').directive('ngSetting', ['$timeout', '$q', 'ariaNgConstants', 'ariaNgLocalizationService', 'aria2SettingService', function ($timeout, $q, ariaNgConstants, ariaNgLocalizationService, aria2SettingService) {
         return {
             restrict: 'E',
             templateUrl: 'views/setting.html',
@@ -22,6 +22,14 @@
 
                 angular.extend(options, attrs);
 
+                var loadHistory = function () {
+                    if (!scope.option || !scope.option.showHistory) {
+                        return;
+                    }
+
+                    scope.history = aria2SettingService.getSettingHistory(scope.option.key);
+                };
+
                 var destroyTooltip = function () {
                     angular.element(element).tooltip('destroy');
                 };
@@ -39,7 +47,7 @@
                         }
 
                         angular.element(element).tooltip({
-                            title: $translate.instant(cause, causeParams),
+                            title: ariaNgLocalizationService.getLocalizedText(cause, causeParams),
                             trigger: 'focus',
                             placement: 'auto top',
                             container: element,
@@ -61,7 +69,7 @@
                     var unitIndex = 0;
 
                     for (var i = 0; i < sizeUnits.length; i++) {
-                        if ((size < 1024) || (size % 1024 != 0)) {
+                        if ((size < 1024) || (size % 1024 !== 0)) {
                             break;
                         }
 
@@ -229,6 +237,20 @@
                     }
                 };
 
+                scope.filterHistory = function (userInput) {
+                    var result = [];
+
+                    if (scope.history && userInput) {
+                        for (var i = 0; i < scope.history.length; i++) {
+                            if (scope.history[i].indexOf(userInput) === 0) {
+                                result.push(scope.history[i]);
+                            }
+                        }
+                    }
+
+                    return $q.resolve(result);
+                };
+
                 if (ngModel) {
                     scope.$watch(function () {
                         return ngModel.$viewValue;
@@ -238,6 +260,7 @@
                 }
 
                 scope.$watch('option', function () {
+                    loadHistory();
                     element.find('[data-toggle="popover"]').popover();
                 });
 
@@ -257,6 +280,8 @@
 
                     scope.placeholder = getHumanReadableValue(displayValue);
                 });
+
+                loadHistory();
             }
         };
     }]);

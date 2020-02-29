@@ -2,10 +2,10 @@
     <form name="newTaskForm" ng-submit="startDownload()" novalidate>
         <div class="nav-tabs-custom">
             <ul class="nav nav-tabs">
-                <li ng-class="{'active': context.currentTab == 'links'}">
+                <li ng-class="{'active': context.currentTab === 'links'}">
                     <a class="pointer-cursor" ng-click="changeTab('links')" ng-bind="(context.taskType === 'torrent' ? 'Torrent File' : (context.taskType === 'metalink' ? 'Metalink File' : 'Links') | translate)">Links</a>
                 </li>
-                <li ng-class="{'active': context.currentTab == 'options'}">
+                <li ng-class="{'active': context.currentTab === 'options'}">
                     <a class="pointer-cursor" ng-click="changeTab('options')" translate>Options</a>
                 </li>
                 <li class="divider"></li>
@@ -22,7 +22,7 @@
                     <div class="btn-group">
                         <button type="submit" class="btn btn-sm"
                                 ng-class="{'btn-default': !context.uploadFile && newTaskForm.$invalid, 'btn-success': context.uploadFile || !newTaskForm.$invalid}"
-                                ng-disabled="!context.uploadFile && newTaskForm.$invalid" translate>Start Download
+                                ng-disabled="!context.uploadFile && newTaskForm.$invalid" translate>Download Now
                         </button>&nbsp;
                         <button type="button" class="btn btn-sm dropdown-toggle"
                                 ng-class="{'btn-default': !context.uploadFile && newTaskForm.$invalid, 'btn-success': context.uploadFile || !newTaskForm.$invalid}"
@@ -30,23 +30,22 @@
                             <span class="caret"></span>
                         </button>
                         <ul class="dropdown-menu right-align">
-                            <li><a class="pointer-cursor" ng-click="startDownload(true)" translate>Manual Download</a></li>
+                            <li><a class="pointer-cursor" ng-click="startDownload(true)" translate>Download Later</a></li>
                         </ul>
                     </div>
                 </li>
             </ul>
 
             <div class="tab-content no-padding">
-                <div class="tab-pane" ng-class="{'active': context.currentTab == 'links'}">
+                <div class="tab-pane" ng-class="{'active': context.currentTab === 'links'}">
                     <div class="new-task-table" ng-if="context.taskType === 'urls'">
                         <div class="row">
                             <div class="col-sm-12">
-                                <p translate>Download Links:</p>
+                                <p ng-bind="'format.task.new.download-links' | translate: {count: getValidUrlsCount()}">Download Links:</p>
                                 <div class="form-group has-feedback no-margin" ng-class="{ 'has-error' : newTaskForm.urls.$invalid && newTaskForm.urls.$dirty, 'has-success' : newTaskForm.urls.$valid && newTaskForm.urls.$dirty }">
-                                    <textarea name="urls" class="form-control" rows="10" autofocus="autofocus" ng-auto-focus
+                                    <textarea name="urls" class="form-control" rows="10" autofocus="autofocus" ng-auto-focus ng-valid-urls
                                               ng-model="context.urls" ng-required="true" ng-keydown="urlTextboxKeyDown($event)"
-                                              ng-placeholder="'Support multiple URLs, one URL per line.' | translate"
-                                            ng-pattern="/^(\n?(((http|https|ftp|ssh):\/\/.+)|(magnet:\?.+)))*$/i"></textarea>
+                                              ng-placeholder="'Support multiple URLs, one URL per line.' | translate"></textarea>
                                     <div class="form-control-icon" ng-if="newTaskForm.urls.$dirty">
                                         <i class="fa form-control-feedback" ng-class="{'fa-check':newTaskForm.urls.$valid, 'fa-times':newTaskForm.urls.$invalid}"></i>
                                     </div>
@@ -62,8 +61,9 @@
                             </div>
                         </div>
                     </div>
+                    <input id="file-holder" type="file" style="display: none"/>
                 </div>
-                <div class="tab-pane" ng-class="{'active': context.currentTab == 'options'}">
+                <div class="tab-pane" ng-class="{'active': context.currentTab === 'options'}">
                     <div class="settings-table striped hoverable">
                         <div class="settings-table-title new-task-filter-title">
                             <div class="row">

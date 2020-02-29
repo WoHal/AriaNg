@@ -1,10 +1,11 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').controller('TaskDetailController', ['$rootScope', '$scope', '$routeParams', '$interval', 'aria2RpcErrors', 'ariaNgFileTypes', 'ariaNgCommonService', 'ariaNgSettingService', 'ariaNgMonitorService', 'aria2TaskService', 'aria2SettingService', function ($rootScope, $scope, $routeParams, $interval, aria2RpcErrors, ariaNgFileTypes, ariaNgCommonService, ariaNgSettingService, ariaNgMonitorService, aria2TaskService, aria2SettingService) {
-        var tabOrders = ['overview', 'blocks', 'filelist', 'btpeers'];
+    angular.module('ariaNg').controller('TaskDetailController', ['$rootScope', '$scope', '$routeParams', '$interval', 'clipboard', 'aria2RpcErrors', 'ariaNgFileTypes', 'ariaNgCommonService', 'ariaNgSettingService', 'ariaNgMonitorService', 'aria2TaskService', 'aria2SettingService', function ($rootScope, $scope, $routeParams, $interval, clipboard, aria2RpcErrors, ariaNgFileTypes, ariaNgCommonService, ariaNgSettingService, ariaNgMonitorService, aria2TaskService, aria2SettingService) {
+        var tabOrders = ['overview', 'pieces', 'filelist', 'btpeers'];
         var downloadTaskRefreshPromise = null;
         var pauseDownloadTaskRefresh = false;
+        var currentRowTriggeredMenu = null;
 
         var getAvailableOptions = function (status, isBittorrent) {
             var keys = aria2SettingService.getAvailableTaskOptionKeys(status, isBittorrent);
@@ -27,6 +28,11 @@
 
             if (!$scope.task || $scope.task.status !== task.status) {
                 $scope.context.availableOptions = getAvailableOptions(task.status, !!task.bittorrent);
+            }
+
+            if ($scope.task) {
+                delete $scope.task.verifiedLength;
+                delete $scope.task.verifyIntegrityPending;
             }
 
             $scope.task = ariaNgCommonService.copyObjectTo(task, $scope.task);
@@ -64,6 +70,7 @@
             };
 
             var includeLocalPeer = true;
+            var addVirtualFileNode = true;
 
             if (!$scope.task) {
                 return aria2TaskService.getTaskStatus($routeParams.gid, function (response) {
@@ -72,6 +79,7 @@
                     }
 
                     var task = response.data;
+
                     processTask(task);
 
                     if (requireBtPeers(task)) {
@@ -81,7 +89,7 @@
                             }
                         }, silent, includeLocalPeer);
                     }
-                }, silent);
+                }, silent, addVirtualFileNode);
             } else {
                 return aria2TaskService.getTaskStatusAndBtPeers($routeParams.gid, function (response) {
                     if (!response.success) {
@@ -90,7 +98,7 @@
 
                     processTask(response.task);
                     processPeers(response.peers);
-                }, silent, requireBtPeers($scope.task), includeLocalPeer);
+                }, silent, requireBtPeers($scope.task), includeLocalPeer, addVirtualFileNode);
             }
         };
 
@@ -105,7 +113,7 @@
             for (var i = 0; i < $scope.task.files.length; i++) {
                 var file = $scope.task.files[i];
 
-                if (file && file.selected) {
+                if (file && file.selected && !file.isDir) {
                     selectedFileIndex.push(file.index);
                 }
             }
@@ -121,10 +129,79 @@
             }, silent);
         };
 
+        var setSelectedNode = function (node, value) {
+            if (!node) {
+                return;
+            }
+
+            if (node.files && node.files.length) {
+                for (var i = 0; i < node.files.length; i++) {
+                    var fileNode = node.files[i];
+                    fileNode.selected = value;
+                }
+            }
+
+            if (node.subDirs && node.subDirs.length) {
+                for (var i = 0; i < node.subDirs.length; i++) {
+                    var dirNode = node.subDirs[i];
+                    setSelectedNode(dirNode, value);
+                }
+            }
+
+            node.selected = value;
+            node.partialSelected = false;
+        };
+
+        var updateDirNodeSelectedStatus = function (node) {
+            if (!node) {
+                return;
+            }
+
+            var selectedSubNodesCount = 0;
+            var partitalSelectedSubNodesCount = 0;
+
+            if (node.files && node.files.length) {
+                for (var i = 0; i < node.files.length; i++) {
+                    var fileNode = node.files[i];
+                    selectedSubNodesCount += (fileNode.selected ? 1 : 0);
+                }
+            }
+
+            if (node.subDirs && node.subDirs.length) {
+                for (var i = 0; i < node.subDirs.length; i++) {
+                    var dirNode = node.subDirs[i];
+                    updateDirNodeSelectedStatus(dirNode);
+                    selectedSubNodesCount += (dirNode.selected ? 1 : 0);
+                    partitalSelectedSubNodesCount += (dirNode.partialSelected ? 1 : 0);
+                }
+            }
+
+            node.selected = (selectedSubNodesCount > 0 && selectedSubNodesCount === (node.subDirs.length + node.files.length));
+            node.partialSelected = ((selectedSubNodesCount > 0 && selectedSubNodesCount < (node.subDirs.length + node.files.length)) || partitalSelectedSubNodesCount > 0);
+        };
+
+        var updateAllDirNodesSelectedStatus = function () {
+            if (!$scope.task || !$scope.task.multiDir) {
+                return;
+            }
+
+            for (var i = 0; i < $scope.task.files.length; i++) {
+                var node = $scope.task.files[i];
+
+                if (!node.isDir) {
+                    continue;
+                }
+
+                updateDirNodeSelectedStatus(node);
+            }
+        };
+
         $scope.context = {
             currentTab: 'overview',
             isEnableSpeedChart: ariaNgSettingService.getDownloadTaskRefreshInterval() > 0,
             showChooseFilesToolbar: false,
+            fileExtensions: [],
+            collapsedDirs: {},
             btPeers: [],
             healthPercent: 0,
             collapseTrackers: true,
@@ -164,6 +241,10 @@
         };
 
         $scope.changeFileListDisplayOrder = function (type, autoSetReverse) {
+            if ($scope.task && $scope.task.multiDir) {
+                return;
+            }
+
             var oldType = ariaNgCommonService.parseOrderType(ariaNgSettingService.getFileListDisplayOrder());
             var newType = ariaNgCommonService.parseOrderType(type);
 
@@ -182,22 +263,52 @@
         };
 
         $scope.getFileListOrderType = function () {
+            if ($scope.task && $scope.task.multiDir) {
+                return null;
+            }
+
             return ariaNgSettingService.getFileListDisplayOrder();
         };
 
         $scope.showChooseFilesToolbar = function () {
-            pauseDownloadTaskRefresh = true;
-            $scope.context.showChooseFilesToolbar = true;
+            if (!$scope.context.showChooseFilesToolbar) {
+                pauseDownloadTaskRefresh = true;
+                $scope.context.showChooseFilesToolbar = true;
+            } else {
+                $scope.cancelChooseFiles();
+            }
         };
 
-        $scope.getSelectedFileCount = function () {
-            var count = 0;
-
-            for (var i = 0; i < $scope.task.files.length; i++) {
-                count += $scope.task.files[i].selected ? 1 : 0;
+        $scope.isAnyFileSelected = function () {
+            if (!$scope.task || !$scope.task.files) {
+                return false;
             }
 
-            return count;
+            for (var i = 0; i < $scope.task.files.length; i++) {
+                var file = $scope.task.files[i];
+
+                if (!file.isDir && file.selected) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $scope.isAllFileSelected = function () {
+            if (!$scope.task || !$scope.task.files) {
+                return false;
+            }
+
+            for (var i = 0; i < $scope.task.files.length; i++) {
+                var file = $scope.task.files[i];
+
+                if (!file.isDir && !file.selected) {
+                    return false;
+                }
+            }
+
+            return true;
         };
 
         $scope.selectFiles = function (type) {
@@ -205,15 +316,31 @@
                 return;
             }
 
-            for (var i = 0; i < $scope.task.files.length; i++) {
-                if (type === 'all') {
-                    $scope.task.files[i].selected = true;
-                } else if (type === 'none') {
-                    $scope.task.files[i].selected = false;
-                } else if (type === 'reverse') {
-                    $scope.task.files[i].selected = !$scope.task.files[i].selected;
+            if (type === 'auto') {
+                if ($scope.isAllFileSelected()) {
+                    type = 'none';
+                } else {
+                    type = 'all';
                 }
             }
+
+            for (var i = 0; i < $scope.task.files.length; i++) {
+                var file = $scope.task.files[i];
+
+                if (file.isDir) {
+                    continue;
+                }
+
+                if (type === 'all') {
+                    file.selected = true;
+                } else if (type === 'none') {
+                    file.selected = false;
+                } else if (type === 'reverse') {
+                    file.selected = !file.selected;
+                }
+            }
+
+            updateAllDirNodesSelectedStatus();
         };
 
         $scope.chooseSpecifiedFiles = function (type) {
@@ -221,12 +348,19 @@
                 return;
             }
 
-            var extensions = ariaNgFileTypes[type];
+            var files = $scope.task.files;
+            var extensions = ariaNgFileTypes[type].extensions;
             var fileIndexes = [];
             var isAllSelected = true;
 
-            for (var i = 0; i < $scope.task.files.length; i++) {
-                var extension = ariaNgCommonService.getFileExtension($scope.task.files[i].fileName);
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+
+                if (file.isDir) {
+                    continue;
+                }
+
+                var extension = ariaNgCommonService.getFileExtension(file.fileName);
 
                 if (extension) {
                     extension = extension.toLowerCase();
@@ -235,7 +369,7 @@
                 if (extensions.indexOf(extension) >= 0) {
                     fileIndexes.push(i);
 
-                    if (!$scope.task.files[i].selected) {
+                    if (!file.selected) {
                         isAllSelected = false;
                     }
                 }
@@ -243,8 +377,14 @@
 
             for (var i = 0; i < fileIndexes.length; i++) {
                 var index = fileIndexes[i];
-                $scope.task.files[index].selected = !isAllSelected;
+                var file = files[index];
+
+                if (file && !file.isDir) {
+                    file.selected = !isAllSelected;
+                }
             }
+
+            updateAllDirNodesSelectedStatus();
         };
 
         $scope.saveChoosedFiles = function () {
@@ -262,9 +402,193 @@
             }
         };
 
-        $scope.setSelectedFile = function () {
+        $scope.showCustomChooseFileModal = function () {
+            if (!$scope.task || !$scope.task.files) {
+                return;
+            }
+
+            var files = $scope.task.files;
+            var extensionsMap = {};
+
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+
+                if (file.isDir) {
+                    continue;
+                }
+
+                var extension = ariaNgCommonService.getFileExtension(file.fileName);
+
+                if (extension) {
+                    extension = extension.toLowerCase();
+                }
+
+                var extensionInfo = extensionsMap[extension];
+
+                if (!extensionInfo) {
+                    var extensionName = extension;
+
+                    if (extensionName.length > 0 && extensionName.charAt(0) === '.') {
+                        extensionName = extensionName.substring(1);
+                    }
+
+                    extensionInfo = {
+                        extension: extensionName,
+                        classified: false,
+                        selected: false,
+                        selectedCount: 0,
+                        unSelectedCount: 0
+                    };
+
+                    extensionsMap[extension] = extensionInfo;
+                }
+
+                if (file.selected) {
+                    extensionInfo.selected = true;
+                    extensionInfo.selectedCount++;
+                } else {
+                    extensionInfo.unSelectedCount++;
+                }
+            }
+
+            var allClassifiedExtensions = {};
+
+            for (var type in ariaNgFileTypes) {
+                if (!ariaNgFileTypes.hasOwnProperty(type)) {
+                    continue;
+                }
+
+                var extensionTypeName = ariaNgFileTypes[type].name;
+                var allExtensions = ariaNgFileTypes[type].extensions;
+                var extensions = [];
+
+                for (var i = 0; i < allExtensions.length; i++) {
+                    var extension = allExtensions[i];
+                    var extensionInfo = extensionsMap[extension];
+
+                    if (extensionInfo) {
+                        extensionInfo.classified = true;
+                        extensions.push(extensionInfo);
+                    }
+                }
+
+                if (extensions.length > 0) {
+                    allClassifiedExtensions[type] = {
+                        name: extensionTypeName,
+                        extensions: extensions
+                    };
+                }
+            }
+
+            var unClassifiedExtensions = [];
+
+            for (var extension in extensionsMap) {
+                if (!extensionsMap.hasOwnProperty(extension)) {
+                    continue;
+                }
+
+                var extensionInfo = extensionsMap[extension];
+
+                if (!extensionInfo.classified) {
+                    unClassifiedExtensions.push(extensionInfo);
+                }
+            }
+
+            if (unClassifiedExtensions.length > 0) {
+                allClassifiedExtensions.other = {
+                    name: 'Other',
+                    extensions: unClassifiedExtensions
+                };
+            }
+
+            $scope.context.fileExtensions = allClassifiedExtensions;
+            angular.element('#custom-choose-file-modal').modal();
+        };
+
+        $scope.setSelectedExtension = function (selectedExtension, selected) {
+            if (!$scope.task || !$scope.task.files) {
+                return;
+            }
+
+            var files = $scope.task.files;
+
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+
+                if (file.isDir) {
+                    continue;
+                }
+
+                var extension = ariaNgCommonService.getFileExtension(file.fileName);
+
+                if (extension) {
+                    extension = extension.toLowerCase();
+                }
+
+                if (extension !== '.' + selectedExtension) {
+                    continue;
+                }
+
+                file.selected = selected;
+            }
+
+            updateAllDirNodesSelectedStatus();
+        };
+
+        $('#custom-choose-file-modal').on('hide.bs.modal', function (e) {
+            $scope.context.fileExtensions = null;
+        });
+
+        $scope.setSelectedFile = function (updateNodeSelectedStatus) {
+            if (updateNodeSelectedStatus) {
+                updateAllDirNodesSelectedStatus();
+            }
+
             if (!$scope.context.showChooseFilesToolbar) {
                 setSelectFiles(true);
+            }
+        };
+
+        $scope.collapseDir = function (dirNode, newValue, forceRecurse) {
+            var nodePath = dirNode.nodePath;
+
+            if (angular.isUndefined(newValue)) {
+                newValue = !$scope.context.collapsedDirs[nodePath];
+            }
+
+            if (newValue || forceRecurse) {
+                for (var i = 0; i < dirNode.subDirs.length; i++) {
+                    $scope.collapseDir(dirNode.subDirs[i], newValue);
+                }
+            }
+
+            if (nodePath) {
+                $scope.context.collapsedDirs[nodePath] = newValue;
+            }
+        };
+
+        $scope.collapseAllDirs = function (newValue) {
+            if (!$scope.task || !$scope.task.files) {
+                return;
+            }
+
+            for (var i = 0; i < $scope.task.files.length; i++) {
+                var node = $scope.task.files[i];
+
+                if (!node.isDir) {
+                    continue;
+                }
+
+                $scope.collapseDir(node, newValue, true);
+            }
+        };
+
+        $scope.setSelectedNode = function (dirNode) {
+            setSelectedNode(dirNode, dirNode.selected);
+            updateAllDirNodesSelectedStatus();
+
+            if (!$scope.context.showChooseFilesToolbar) {
+                $scope.setSelectedFile(false);
             }
         };
 
@@ -308,6 +632,26 @@
             }, true);
         };
 
+        $scope.copySelectedRowText = function () {
+            if (!currentRowTriggeredMenu) {
+                return;
+            }
+
+            var name = currentRowTriggeredMenu.find('.setting-key > span').text().trim();
+            var value = "";
+
+            currentRowTriggeredMenu.find('.setting-value > span').each(function (i, element) {
+                if (i > 0) {
+                    value += '\n';
+                }
+
+                value += angular.element(element).text().trim();
+            });
+
+            var info = name + ': ' + value;
+            clipboard.copyText(info);
+        };
+
         if (ariaNgSettingService.getDownloadTaskRefreshInterval() > 0) {
             downloadTaskRefreshPromise = $interval(function () {
                 if ($scope.task && ($scope.task.status === 'complete' || $scope.task.status === 'error' || $scope.task.status === 'removed')) {
@@ -323,6 +667,19 @@
             if (downloadTaskRefreshPromise) {
                 $interval.cancel(downloadTaskRefreshPromise);
             }
+        });
+
+        $scope.onOverviewMouseDown = function () {
+            angular.element('#overview-items .row[contextmenu-bind!="true"]').contextmenu({
+                target: '#task-overview-contextmenu',
+                before: function (e, context) {
+                    currentRowTriggeredMenu = context;
+                }
+            }).attr('contextmenu-bind', 'true');
+        };
+
+        angular.element('#task-overview-contextmenu').on('hide.bs.context', function () {
+            currentRowTriggeredMenu = null;
         });
 
         $rootScope.loadPromise = refreshDownloadTask(false);

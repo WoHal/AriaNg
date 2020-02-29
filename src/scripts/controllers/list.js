@@ -32,6 +32,14 @@
                     $rootScope.taskContext.list = taskList;
                     needRequestWholeInfo = false;
                 } else {
+                    if ($rootScope.taskContext.list && $rootScope.taskContext.list.length > 0) {
+                        for (var i = 0; i < $rootScope.taskContext.list.length; i++) {
+                            var task = $rootScope.taskContext.list[i];
+                            delete task.verifiedLength;
+                            delete task.verifyIntegrityPending;
+                        }
+                    }
+
                     if (ariaNgCommonService.extendArray(taskList, $rootScope.taskContext.list, 'gid')) {
                         needRequestWholeInfo = false;
                     } else {
@@ -64,18 +72,6 @@
 
                 $rootScope.taskContext.enableSelectAll = $rootScope.taskContext.list && $rootScope.taskContext.list.length > 0;
             }, silent);
-        };
-
-        $scope.filterByTaskName = function (task) {
-            if (!task || !angular.isString(task.taskName)) {
-                return false;
-            }
-
-            if (!$rootScope.searchContext || !$rootScope.searchContext.text) {
-                return true;
-            }
-
-            return (task.taskName.toLowerCase().indexOf($rootScope.searchContext.text.toLowerCase()) >= 0);
         };
 
         $scope.getOrderType = function () {

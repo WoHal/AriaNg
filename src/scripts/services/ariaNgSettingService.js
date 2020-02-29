@@ -1,14 +1,42 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('ariaNgSettingService', ['$window', '$location', '$filter', '$translate', 'base64', 'amMoment', 'localStorageService', 'ariaNgConstants', 'ariaNgDefaultOptions', 'ariaNgLanguages', 'ariaNgCommonService', function ($window, $location, $filter, $translate, base64, amMoment, localStorageService, ariaNgConstants, ariaNgDefaultOptions, ariaNgLanguages, ariaNgCommonService) {
+    angular.module('ariaNg').factory('ariaNgSettingService', ['$window', '$location', '$filter', 'ariaNgConstants', 'ariaNgDefaultOptions', 'ariaNgLanguages', 'ariaNgCommonService', 'ariaNgLogService', 'ariaNgStorageService', function ($window, $location, $filter, ariaNgConstants, ariaNgDefaultOptions, ariaNgLanguages, ariaNgCommonService, ariaNgLogService, ariaNgStorageService) {
+        var browserFeatures = (function () {
+            var supportLocalStroage = ariaNgStorageService.isLocalStorageSupported();
+            var supportCookies = ariaNgStorageService.isCookiesSupported();
+
+            return {
+                localStroage: supportLocalStroage,
+                cookies: supportCookies
+            };
+        })();
+        var browserSupportStorage = browserFeatures.localStroage || browserFeatures.cookies;
+        var browserSupportAppCache = !!$window.applicationCache;
+
+        var onAppCacheUpdatedCallbacks = [];
         var onFirstVisitCallbacks = [];
+        var firstVisitCallbackFired = false;
         var sessionSettings = {
             debugMode: false
         };
 
+        if (browserSupportAppCache) {
+            var appCache = $window.applicationCache;
+            appCache.addEventListener('updateready', function (e) {
+                for (var i = 0; i < onAppCacheUpdatedCallbacks.length; i++) {
+                    var callback = onAppCacheUpdatedCallbacks[i];
+                    callback();
+                }
+            }, false);
+        }
+
         var fireFirstVisitEvent = function () {
-            if (!angular.isArray(onFirstVisitCallbacks) || onFirstVisitCallbacks.length < 1) {
+            if (!browserSupportStorage) {
+                return;
+            }
+
+            if (firstVisitCallbackFired || !angular.isArray(onFirstVisitCallbacks) || onFirstVisitCallbacks.length < 1) {
                 return;
             }
 
@@ -16,6 +44,14 @@
                 var callback = onFirstVisitCallbacks[i];
                 callback();
             }
+
+            firstVisitCallbackFired = true;
+        };
+
+        var isInsecureProtocolDisabled = function () {
+            var protocol = $location.protocol();
+
+            return protocol === 'https';
         };
 
         var getLanguageNameFromAlias = function (alias) {
@@ -86,11 +122,11 @@
         };
 
         var setOptions = function (options) {
-            return localStorageService.set(ariaNgConstants.optionStorageKey, options);
+            return ariaNgStorageService.set(ariaNgConstants.optionStorageKey, options);
         };
 
         var getOptions = function () {
-            var options = localStorageService.get(ariaNgConstants.optionStorageKey);
+            var options = ariaNgStorageService.get(ariaNgConstants.optionStorageKey);
 
             if (options && !ariaNgLanguages[options.language]) {
                 options.language = getLanguageNameFromAliasOrDefaultLanguage(options.language);
@@ -100,6 +136,20 @@
                 options = angular.extend({}, ariaNgDefaultOptions);
                 options.language = getDefaultLanguage();
 
+                if (!options.rpcHost) {
+                    initRpcSettingWithDefaultHostAndProtocol(options);
+                }
+
+                if (angular.isArray(options.extendRpcServers)) {
+                    for (var i = 0; i < options.extendRpcServers.length; i++) {
+                        var rpcSetting = options.extendRpcServers[i];
+
+                        if (!rpcSetting.rpcHost) {
+                            initRpcSettingWithDefaultHostAndProtocol(rpcSetting);
+                        }
+                    }
+                }
+
                 setOptions(options);
                 fireFirstVisitEvent();
             }
@@ -108,7 +158,7 @@
         };
 
         var clearAll = function () {
-            return localStorageService.clearAll();
+            return ariaNgStorageService.clearAll();
         };
 
         var getOption = function (key) {
@@ -129,6 +179,14 @@
             setOptions(options);
         };
 
+        var initRpcSettingWithDefaultHostAndProtocol = function (setting) {
+            setting.rpcHost = getDefaultRpcHost();
+
+            if (isInsecureProtocolDisabled()) {
+                setting.protocol = ariaNgConstants.defaultSecureProtocol;
+            }
+        };
+
         var cloneRpcSetting = function (setting) {
             return {
                 rpcAlias: setting.rpcAlias,
@@ -144,33 +202,35 @@
         var createNewRpcSetting = function () {
             var setting = cloneRpcSetting(ariaNgDefaultOptions);
             setting.rpcId = ariaNgCommonService.generateUniqueId();
-            setting.rpcHost = getDefaultRpcHost();
+
+            initRpcSettingWithDefaultHostAndProtocol(setting);
 
             return setting;
         };
 
         return {
+            isBrowserSupportStorage: function () {
+                return browserSupportStorage;
+            },
+            isBrowserSupportApplicationCache: function () {
+                return browserSupportAppCache;
+            },
+            getBrowserFeatures: function () {
+                return browserFeatures;
+            },
             getAllOptions: function () {
                 var options = angular.extend({}, ariaNgDefaultOptions, getOptions());
 
-                if (!options.rpcHost) {
-                    options.rpcHost = getDefaultRpcHost();
-                }
-
                 if (options.secret) {
-                    options.secret = base64.decode(options.secret);
+                    options.secret = ariaNgCommonService.base64Decode(options.secret);
                 }
 
                 if (angular.isArray(options.extendRpcServers)) {
                     for (var i = 0; i < options.extendRpcServers.length; i++) {
                         var rpcSetting = options.extendRpcServers[i];
 
-                        if (!rpcSetting.rpcHost) {
-                            rpcSetting.rpcHost = getDefaultRpcHost();
-                        }
-
                         if (rpcSetting.secret) {
-                            rpcSetting.secret = base64.decode(rpcSetting.secret);
+                            rpcSetting.secret = ariaNgCommonService.base64Decode(rpcSetting.secret);
                         }
                     }
                 }
@@ -194,34 +254,84 @@
                     }
                 }
 
+                var displayOrder = this.getRPCListDisplayOrder();
+
+                if (displayOrder === 'recentlyUsed') {
+                    // Do Nothing
+                } else if (displayOrder === 'rpcAlias') {
+                    result.sort(function (rpc1, rpc2) {
+                        return String.naturalCompare(rpc1.rpcAlias, rpc2.rpcAlias);
+                    });
+                }
+
                 return result;
+            },
+            importAllOptions: function (options) {
+                var finalOptions = angular.copy(ariaNgDefaultOptions);
+
+                for (var key in options) {
+                    if (!options.hasOwnProperty(key) || !finalOptions.hasOwnProperty(key)) {
+                        continue;
+                    }
+
+                    if (angular.isObject(options[key]) || angular.isArray(options[key])) {
+                        continue;
+                    }
+
+                    finalOptions[key] = options[key];
+                }
+
+                if (angular.isArray(options.extendRpcServers)) {
+                    for (var i = 0; i < options.extendRpcServers.length; i++) {
+                        var rpcSetting = options.extendRpcServers[i];
+                        var finalRpcSetting = createNewRpcSetting();
+
+                        for (var key in rpcSetting) {
+                            if (!rpcSetting.hasOwnProperty(key) || !finalRpcSetting.hasOwnProperty(key)) {
+                                continue;
+                            }
+
+                            if (angular.isObject(rpcSetting[key]) || angular.isArray(rpcSetting[key])) {
+                                continue;
+                            }
+
+                            finalRpcSetting[key] = rpcSetting[key];
+                        }
+
+                        finalOptions.extendRpcServers.push(finalRpcSetting);
+                    }
+                }
+
+                setOptions(finalOptions);
+            },
+            exportAllOptions: function () {
+                var options = angular.extend({}, ariaNgDefaultOptions, getOptions());
+
+                return options;
             },
             getAllSessionOptions: function () {
                 return angular.copy(sessionSettings);
             },
-            applyLanguage: function (lang) {
-                if (!ariaNgLanguages[lang]) {
-                    return false;
-                }
-
-                $translate.use(lang);
-                amMoment.changeLocale(lang);
-
-                return true;
+            isInsecureProtocolDisabled: function () {
+                return isInsecureProtocolDisabled();
             },
             getLanguage: function () {
                 return getOption('language');
             },
             setLanguage: function (value) {
-                if (this.applyLanguage(value)) {
-                    setOption('language', value);
+                if (!ariaNgLanguages[value]) {
+                    return false;
                 }
+
+                setOption('language', value);
+                return true;
             },
             isEnableDebugMode: function () {
                 return sessionSettings.debugMode;
             },
             setDebugMode: function (value) {
                 sessionSettings.debugMode = value;
+                ariaNgLogService.setEnableDebugLog(value);
             },
             getTitle: function () {
                 return getOption('title');
@@ -229,11 +339,35 @@
             setTitle: function (value) {
                 setOption('title', value);
             },
+            getBrowserNotification: function () {
+                return getOption('browserNotification');
+            },
+            setBrowserNotification: function (value) {
+                setOption('browserNotification', value);
+            },
             getTitleRefreshInterval: function () {
                 return getOption('titleRefreshInterval');
             },
             setTitleRefreshInterval: function (value) {
                 setOption('titleRefreshInterval', Math.max(parseInt(value), 0));
+            },
+            getGlobalStatRefreshInterval: function () {
+                return getOption('globalStatRefreshInterval');
+            },
+            setGlobalStatRefreshInterval: function (value) {
+                setOption('globalStatRefreshInterval', Math.max(parseInt(value), 0));
+            },
+            getDownloadTaskRefreshInterval: function () {
+                return getOption('downloadTaskRefreshInterval');
+            },
+            setDownloadTaskRefreshInterval: function (value) {
+                setOption('downloadTaskRefreshInterval', Math.max(parseInt(value), 0));
+            },
+            getRPCListDisplayOrder: function () {
+                return getOption('rpcListDisplayOrder');
+            },
+            setRPCListDisplayOrder: function (value) {
+                setOption('rpcListDisplayOrder', value);
             },
             getAfterCreatingNewTask: function () {
                 return getOption('afterCreatingNewTask');
@@ -241,40 +375,56 @@
             setAfterCreatingNewTask: function (value) {
                 setOption('afterCreatingNewTask', value);
             },
-            getBrowserNotification: function () {
-                return getOption('browserNotification');
+            getRemoveOldTaskAfterRetrying: function () {
+                return getOption('removeOldTaskAfterRetrying');
             },
-            setBrowserNotification: function (value) {
-                setOption('browserNotification', value);
+            setRemoveOldTaskAfterRetrying: function (value) {
+                setOption('removeOldTaskAfterRetrying', value);
             },
-            getCurrentRpcUrl: function () {
-                var protocol = getOption('protocol');
-                var rpcHost = getOption('rpcHost');
-                var rpcPort = getOption('rpcPort');
-                var rpcInterface = getOption('rpcInterface');
+            getConfirmTaskRemoval: function () {
+                return getOption('confirmTaskRemoval');
+            },
+            setConfirmTaskRemoval: function (value) {
+                setOption('confirmTaskRemoval', value);
+            },
+            getAfterRetryingTask: function () {
+                return getOption('afterRetryingTask');
+            },
+            setAfterRetryingTask: function (value) {
+                setOption('afterRetryingTask', value);
+            },
+            getCurrentRpcDisplayName: function () {
+                var options = getOptions();
 
-                if (!rpcHost) {
-                    rpcHost = getDefaultRpcHost();
+                if (options.rpcAlias) {
+                    return options.rpcAlias;
                 }
 
-                return protocol + '://' + rpcHost + ':' + rpcPort + '/' + rpcInterface;
+                return options.rpcHost + ':' + options.rpcPort;
             },
-            getCurrentRpcProtocol: function () {
-                return getOption('protocol');
+            getCurrentRpcUrl: function () {
+                var options = getOptions();
+                var protocol = options.protocol;
+                var rpcHost = options.rpcHost;
+                var rpcPort = options.rpcPort;
+                var rpcInterface = options.rpcInterface;
+
+                return protocol + '://' + rpcHost + ':' + rpcPort + '/' + rpcInterface;
             },
             getCurrentRpcHttpMethod: function () {
                 return getOption('httpMethod');
             },
             isCurrentRpcUseWebSocket: function (protocol) {
                 if (!protocol) {
-                    protocol = this.getCurrentRpcProtocol();
+                    var options = getOptions();
+                    protocol = options.protocol;
                 }
 
                 return protocol === 'ws' || protocol === 'wss';
             },
             getCurrentRpcSecret: function () {
                 var value = getOption('secret');
-                return (value ? base64.decode(value) : value);
+                return (value ? ariaNgCommonService.base64Decode(value) : value);
             },
             addNewRpcSetting: function () {
                 var options = getOptions();
@@ -307,7 +457,7 @@
                     value = Math.max(parseInt(value), 0);
                 } else if (field === 'secret') {
                     if (value) {
-                        value = base64.encode(value);
+                        value = ariaNgCommonService.base64Encode(value);
                     }
                 }
 
@@ -380,7 +530,7 @@
                     newDefaultSetting = cloneRpcSetting(setting);
 
                     if (newDefaultSetting.secret) {
-                        newDefaultSetting.secret = base64.encode(newDefaultSetting.secret);
+                        newDefaultSetting.secret = ariaNgCommonService.base64Encode(newDefaultSetting.secret);
                     }
                 }
 
@@ -429,18 +579,6 @@
 
                 return true;
             },
-            getGlobalStatRefreshInterval: function () {
-                return getOption('globalStatRefreshInterval');
-            },
-            setGlobalStatRefreshInterval: function (value) {
-                setOption('globalStatRefreshInterval', Math.max(parseInt(value), 0));
-            },
-            getDownloadTaskRefreshInterval: function () {
-                return getOption('downloadTaskRefreshInterval');
-            },
-            setDownloadTaskRefreshInterval: function (value) {
-                setOption('downloadTaskRefreshInterval', Math.max(parseInt(value), 0));
-            },
             getDisplayOrder: function () {
                 var value = getOption('displayOrder');
 
@@ -479,6 +617,13 @@
             },
             resetSettings: function () {
                 clearAll();
+            },
+            onApplicationCacheUpdated: function (callback) {
+                if (!callback) {
+                    return;
+                }
+
+                onAppCacheUpdatedCallbacks.push(callback);
             },
             onFirstAccess: function (callback) {
                 if (!callback) {

@@ -3,8 +3,24 @@
     overflow-y: hidden;
 }
 
-.skin-aria-ng, h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, .sweet-alert {
-    font-family: 'Hiragino Sans GB', 'Microsoft YaHei', 'STHeiti', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+.skin-aria-ng,
+.skin-aria-ng h1,
+.skin-aria-ng h2,
+.skin-aria-ng h3,
+.skin-aria-ng h4,
+.skin-aria-ng h5,
+.skin-aria-ng h6,
+.skin-aria-ng .h1,
+.skin-aria-ng .h2,
+.skin-aria-ng .h3,
+.skin-aria-ng .h4,
+.skin-aria-ng .h5,
+.skin-aria-ng .h6,
+.skin-aria-ng .main-header .logo,
+.skin-aria-ng .sweet-alert,
+.skin-aria-ng .popover,
+.skin-aria-ng .tooltip {
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
 
 .skin-aria-ng .main-header .navbar {
@@ -71,29 +87,23 @@
 }
 
 .skin-aria-ng .main-header .logo .logo-lg .logo-lg-title {
-    margin-right: 2px;
+    margin-right: 6px;
 }
 
 .skin-aria-ng .main-header .logo .dropdown-menu {
     margin-top: -1px;
-    border-color: #59636b;
-    background-color: #3c4852;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
 }
 
-.skin-aria-ng .main-header .logo .dropdown-menu > li > a {
-    color: #a2b5b9;
-}
-
-.skin-aria-ng .main-header .logo .dropdown-menu > li:hover > a {
-    color: #dfdfdf;
-    background-color: #313a42;
-}
-
 .skin-aria-ng .main-header .logo .dropdown-menu > li.active > a {
-    color: #5399e8;
-    background-color: #252c30;
+    color: #777;
+    background-color: #fff;
+}
+
+.skin-aria-ng .main-header .logo .dropdown-menu > li.active:hover > a {
+    color: #333;
+    background-color: #e1e3e9;
 }
 
 .skin-aria-ng .content-header {
@@ -270,7 +280,11 @@
 }
 
 .skin-aria-ng .icon-expand {
-    color: #5399e8  ;
+    color: #5399e8;
+}
+
+.skin-aria-ng .icon-dir-expand {
+    color: #999;
 }
 
 .skin-aria-ng .nav-tabs-custom {
@@ -460,7 +474,10 @@
 }
 
 /* awesome-bootstrap-checkbox extend */
-.skin-aria-ng .checkbox-primary input[type="checkbox"]:checked + label::before, .checkbox-primary input[type="radio"]:checked + label::before {
+.skin-aria-ng .checkbox-primary input[type="checkbox"]:checked + label::before,
+.skin-aria-ng .checkbox-primary input[type="radio"]:checked + label::before,
+.skin-aria-ng .checkbox-primary input[type="checkbox"]:indeterminate + label::before,
+.skin-aria-ng .checkbox-primary input[type="radio"]:indeterminate + label::before {
     background-color: #208fe5;
     border-color: #208fe5;
 }

@@ -5,25 +5,32 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui" name="viewport">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes"/>
     <meta name="apple-mobile-web-app-title" content="AriaNg"/>
     <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
-    <meta name="description" content="Aria2 Ng Frontend">
+    <meta name="msapplication-TileColor" content="#3c4852">
+    <meta name="msapplication-TileImage" content="tileicon.png">
+    <meta name="description" content="AriaNg, a modern web frontend making aria2 easier to use.">
     <meta name="theme-color" content="#3c4852">
     <meta name="format-detection" content="telephone=no"/>
     <title>AriaNg</title>
-    <!-- build:css css/bootstrap-3.3.7.min.css -->
-    <link rel="stylesheet" href="../bower_components/bootstrap/dist/css/bootstrap.min.css"/>
+    <link rel="icon" href="favicon.png">
+    <!--[if IE]><link rel="shortcut icon" href="favicon.ico"><![endif]-->
+    <link rel="apple-touch-icon" href="touchicon.png">
+    <!-- build:css css/bootstrap-3.4.1.min.css -->
+    <link rel="stylesheet" href="../node_modules/bootstrap/dist/css/bootstrap.min.css"/>
     <!-- endbuild -->
     <!-- build:css css/plugins.min.css -->
-    <link rel="stylesheet" href="../bower_components/font-awesome/css/font-awesome.min.css"/>
-    <link rel="stylesheet" href="../bower_components/AdminLTE/dist/css/AdminLTE.min.css"/>
-    <link rel="stylesheet" href="../bower_components/sweetalert/dist/sweetalert.css"/>
-    <link rel="stylesheet" href="../bower_components/awesome-bootstrap-checkbox/awesome-bootstrap-checkbox.css"/>
-    <link rel="stylesheet" href="../bower_components/angular/angular-csp.css"/>
-    <link rel="stylesheet" href="../bower_components/angular-ui-notification/dist/angular-ui-notification.min.css"/>
-    <link rel="stylesheet" href="../bower_components/angular-busy/dist/angular-busy.min.css"/>
-    <link rel="stylesheet" href="../bower_components/angular-dragula/dist/dragula.min.css"/>
+    <link rel="stylesheet" href="../node_modules/font-awesome/css/font-awesome.min.css"/>
+    <link rel="stylesheet" href="../node_modules/admin-lte/dist/css/AdminLTE.min.css"/>
+    <link rel="stylesheet" href="../node_modules/sweetalert/dist/sweetalert.css"/>
+    <link rel="stylesheet" href="../node_modules/awesome-bootstrap-checkbox/awesome-bootstrap-checkbox.css"/>
+    <link rel="stylesheet" href="../node_modules/angular/angular-csp.css"/>
+    <link rel="stylesheet" href="../node_modules/angular-ui-notification/dist/angular-ui-notification.min.css"/>
+    <link rel="stylesheet" href="../node_modules/angular-busy/dist/angular-busy.min.css"/>
+    <link rel="stylesheet" href="../node_modules/angular-input-dropdown/inputDropdownStyles.css"/>
+    <link rel="stylesheet" href="../node_modules/angularjs-dragula/dist/dragula.min.css"/>
     <!-- endbuild -->
     <!-- build:css css/aria-ng.min.css -->
     <link rel="stylesheet" href="styles/core/core.css">
@@ -43,12 +50,12 @@
     <header class="main-header">
         <div class="logo">
             <div class="logo-mini">AriaNg</div>
-            <div class="logo-lg" title="AriaNg %%GULP_INJECT_VERSION%%">
+            <div class="logo-lg" title="AriaNg {{ariaNgVersion}}">
                 <div class="dropdown">
                     <span class="dropdown-toggle" data-toggle="dropdown">
-                        <span class="logo-lg-title">AriaNg</span><span class="caret"></span>
+                        <span class="logo-lg-title">AriaNg</span><i class="fa fa-caret-right fa-right-bottom fa-rotate-45 fa-half" aria-hidden="true"></i>
                     </span>
-                    <ul class="dropdown-menu dropdown-menu-right" role="menu">
+                    <ul class="dropdown-menu dropdown-menu-right rpcselect-dropdown" role="menu">
                         <li ng-repeat="setting in rpcSettings" ng-class="{'active': setting.isDefault}">
                             <a class="pointer-cursor" ng-click="switchRpcSetting(setting)">
                                 <span ng-bind="(setting.rpcAlias ? setting.rpcAlias : setting.rpcHost + ':' + setting.rpcPort)">RPC</span>
@@ -142,7 +149,7 @@
                             </li>
                             <li>
                                 <a class="pointer-cursor" ng-click="changeDisplayOrder('remain:asc')">
-                                    <span translate>By Remain Time</span>
+                                    <span translate>By Remaining</span>
                                     <i class="fa" ng-class="{'fa-check': isSetDisplayOrder('remain')}"></i>
                                 </a>
                             </li>
@@ -162,7 +169,7 @@
                     </li>
                     <li class="divider"></li>
                     <li>
-                        <a class="toolbar" title="{{'Help' | translate}}" href="http://github.com/mayswind/AriaNg" target="_blank">
+                        <a class="toolbar" title="{{'Help' | translate}}" href="https://github.com/mayswind/AriaNg" target="_blank">
                             <i class="fa fa-question-circle-o"></i>
                         </a>
                     </li>
@@ -184,7 +191,7 @@
 
     <aside class="main-sidebar">
         <section class="sidebar">
-            <ul id="siderbar-menu" class="sidebar-menu">
+            <ul id="siderbar-menu" class="sidebar-menu" data-widget="tree" data-animation-speed="300">
                 <li class="header" translate>Download</li>
                 <li data-href-match="/downloading">
                     <a href="#!/downloading"><i class="fa fa-arrow-circle-o-down"></i> <span ng-bind="('Downloading' | translate) + (globalStat && globalStat.numActive > 0 ? ' (' + globalStat.numActive + ')' : '')">Downloading</span></a>
@@ -234,8 +241,14 @@
                         </li>
                     </ul>
                 </li>
+                <li class="ng-cloak" data-href-match="/debug" ng-if="enableDebugMode()">
+                    <a href="#!/debug"><i class="fa fa-wrench"></i> <span translate>AriaNg Debug Console</span></a>
+                </li>
                 <li data-href-match="/status">
-                    <a href="#!/status"><i class="fa fa-server"></i> <span translate>Aria2 Status</span> <span class="label pull-right" ng-if="globalStatusContext.isEnabled" ng-class="{'label-primary': taskContext.rpcStatus === 'Connecting', 'label-success': taskContext.rpcStatus === 'Connected', 'label-danger': taskContext.rpcStatus === 'Not Connected'}" ng-bind="taskContext.rpcStatus | translate"></span></a>
+                    <a href="#!/status">
+                        <span class="label pull-right" ng-if="globalStatusContext.isEnabled || isCurrentRpcUseWebSocket" ng-class="{'label-primary': taskContext.rpcStatus === 'Connecting', 'label-success': taskContext.rpcStatus === 'Connected', 'label-danger': taskContext.rpcStatus === 'Disconnected'}" ng-bind="taskContext.rpcStatus | translate"></span>
+                        <i class="fa fa-server"></i> <span translate>Aria2 Status</span>
+                    </a>
                 </li>
             </ul>
         </section>
@@ -252,21 +265,21 @@
             <div class="navbar-toolbar">
                 <ul class="nav navbar-nav">
                     <li>
-                        <a data-toggle="offcanvas" role="button" title="{{'Toggle Navigation' | translate}}">
+                        <a data-toggle="push-menu" role="button" title="{{'Toggle Navigation' | translate}}">
                             <i class="fa fa-bars"></i>
                         </a>
                     </li>
                     <li class="divider"></li>
                     <li class="dropup">
-                        <a class="dropdown-toggle" data-toggle="dropdown" role="button" title="{{'Quick Setting' | translate}}">
+                        <a class="dropdown-toggle" data-toggle="dropdown" role="button" title="{{'Shortcut' | translate}}">
                             <i class="fa fa-wrench"></i>
-                            <span translate>Quick Setting</span>
+                            <span translate>Shortcut</span>
                             <i class="fa fa-caret-right fa-right-bottom fa-rotate-45 fa-half" aria-hidden="true"></i>
                         </a>
                         <ul class="dropdown-menu" role="menu">
                             <li>
-                                <a class="pointer-cursor" ng-click="showQuickSettingDialog('globalSpeedLimit', 'Global Speed Limit')">
-                                    <span translate>Global Speed Limit</span>
+                                <a class="pointer-cursor" ng-click="showQuickSettingDialog('globalSpeedLimit', 'Global Rate Limit')">
+                                    <span translate>Global Rate Limit</span>
                                 </a>
                             </li>
                         </ul>
@@ -293,55 +306,58 @@
     <ng-setting-dialog setting="quickSettingContext"></ng-setting-dialog>
 </div>
 
-<!-- build:js js/jquery-2.2.4.min.js -->
-<script src="../bower_components/jquery/dist/jquery.min.js"></script>
+<!-- build:js js/jquery-3.3.1.min.js -->
+<script src="../node_modules/jquery/dist/jquery.min.js"></script>
 <!-- endbuild -->
-<!-- build:js js/angular-packages-1.6.4.min.js -->
-<script src="../bower_components/angular/angular.min.js"></script>
-<script src="../bower_components/angular-route/angular-route.min.js"></script>
-<script src="../bower_components/angular-sanitize/angular-sanitize.min.js"></script>
-<script src="../bower_components/angular-touch/angular-touch.min.js"></script>
-<script src="../bower_components/angular-messages/angular-messages.min.js"></script>
-<script src="../bower_components/angular-cookies/angular-cookies.min.js"></script>
-<script src="../bower_components/angular-animate/angular-animate.min.js"></script>
+<!-- build:js js/angular-packages-1.6.10.min.js -->
+<script src="../node_modules/angular/angular.min.js"></script>
+<script src="../node_modules/angular-route/angular-route.min.js"></script>
+<script src="../node_modules/angular-sanitize/angular-sanitize.min.js"></script>
+<script src="../node_modules/angular-touch/angular-touch.min.js"></script>
+<script src="../node_modules/angular-messages/angular-messages.min.js"></script>
+<script src="../node_modules/angular-cookies/angular-cookies.min.js"></script>
+<script src="../node_modules/angular-animate/angular-animate.min.js"></script>
 <!-- endbuild -->
-<!-- build:js js/bootstrap-3.3.7.min.js -->
-<script src="../bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+<!-- build:js js/bootstrap-3.4.1.min.js -->
+<script src="../node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
 <!-- endbuild -->
-<!-- build:js js/moment-with-locales-2.18.1.min.js -->
-<script src="../bower_components/moment/min/moment.min.js"></script>
-<script src="../bower_components/moment/locale/zh-cn.js"></script>
-<script src="../bower_components/moment/locale/zh-tw.js"></script>
-<script src="../bower_components/moment-timezone/builds/moment-timezone-with-data-2012-2022.min.js"></script>
+<!-- build:js js/moment-with-locales-2.24.0.min.js -->
+<script src="../node_modules/moment/min/moment.min.js"></script>
+<script src="../node_modules/moment/locale/zh-cn.js"></script>
+<script src="../node_modules/moment/locale/zh-tw.js"></script>
+<script src="../node_modules/moment-timezone/builds/moment-timezone-with-data-2012-2022.min.js"></script>
 <!-- endbuild -->
-<!-- build:js js/echarts-common-3.6.1.min.js -->
-<script src="../bower_components/echarts/dist/echarts.common.min.js"></script>
+<!-- build:js js/echarts-common-3.8.5.min.js -->
+<script src="../node_modules/echarts/dist/echarts.common.min.js"></script>
 <!-- endbuild -->
 <!-- build:js js/plugins.min.js -->
-<script src="../bower_components/AdminLTE/dist/js/app.min.js"></script>
-<script src="../bower_components/jquery-slimscroll/jquery.slimscroll.min.js"></script>
-<script src="../bower_components/sweetalert/dist/sweetalert.min.js"></script>
-<script src="../bower_components/angular-translate/angular-translate.min.js"></script>
-<script src="../bower_components/angular-moment/angular-moment.min.js"></script>
-<script src="../bower_components/angular-websocket/dist/angular-websocket.min.js"></script>
-<script src="../bower_components/angular-utf8-base64/angular-utf8-base64.min.js"></script>
-<script src="../bower_components/angular-local-storage/dist/angular-local-storage.min.js"></script>
-<script src="../bower_components/angular-notification/angular-notification.js"></script>
-<script src="../bower_components/angular-ui-notification/dist/angular-ui-notification.min.js"></script>
-<script src="../bower_components/angular-bittorrent-peerid/angular-bittorrent-peerid.min.js"></script>
-<script src="../bower_components/angular-busy/dist/angular-busy.min.js"></script>
-<script src="../bower_components/angular-promise-buttons/dist/angular-promise-buttons.min.js"></script>
-<script src="../bower_components/angular-dragula/dist/angular-dragula.min.js"></script>
-<script src="../bower_components/ngSweetAlert/SweetAlert.js"></script>
+<script src="../node_modules/admin-lte/dist/js/adminlte.js"></script>
+<script src="../node_modules/jquery-slimscroll/jquery.slimscroll.min.js"></script>
+<script src="../node_modules/sweetalert/dist/sweetalert.min.js"></script>
+<script src="../node_modules/bootstrap-contextmenu/bootstrap-contextmenu.js"></script>
+<script src="../node_modules/natural-compare/index.js"></script>
+<script src="../node_modules/angular-translate/dist/angular-translate.min.js"></script>
+<script src="../node_modules/angular-moment/angular-moment.min.js"></script>
+<script src="../node_modules/angular-websocket/dist/angular-websocket.min.js"></script>
+<script src="../node_modules/angular-utf8-base64/angular-utf8-base64.js"></script>
+<script src="../node_modules/angular-local-storage/dist/angular-local-storage.min.js"></script>
+<script src="../node_modules/angular-ui-notification/dist/angular-ui-notification.min.js"></script>
+<script src="../node_modules/angular-bittorrent-peerid/angular-bittorrent-peerid.min.js"></script>
+<script src="../node_modules/angular-busy/dist/angular-busy.min.js"></script>
+<script src="../node_modules/angular-promise-buttons/dist/angular-promise-buttons.min.js"></script>
+<script src="../node_modules/angular-clipboard/angular-clipboard.js"></script>
+<script src="../node_modules/angular-input-dropdown/inputDropdown.js"></script>
+<script src="../node_modules/angularjs-dragula/dist/angularjs-dragula.min.js"></script>
+<script src="../node_modules/angular-sweetalert/SweetAlert.js"></script>
 <!-- endbuild -->
 <!-- build:js js/aria-ng.min.js -->
 <script src="scripts/core/__core.js"></script>
-<script src="scripts/core/__config.js"></script>
 <script src="scripts/core/__fix.js"></script>
 <script src="scripts/core/app.js"></script>
 <script src="scripts/core/router.js"></script>
 <script src="scripts/core/root.js"></script>
 <script src="scripts/config/constants.js"></script>
+<script src="scripts/config/buildConfiguration.js"></script>
 <script src="scripts/config/configuration.js"></script>
 <script src="scripts/config/fileTypes.js"></script>
 <script src="scripts/config/initiator.js"></script>
@@ -351,6 +367,7 @@
 <script src="scripts/config/aria2Errors.js"></script>
 <script src="scripts/config/aria2RpcConstants.js"></script>
 <script src="scripts/controllers/command.js"></script>
+<script src="scripts/controllers/debug.js"></script>
 <script src="scripts/controllers/main.js"></script>
 <script src="scripts/controllers/new.js"></script>
 <script src="scripts/controllers/m3u8.js"></script>
@@ -363,26 +380,33 @@
 <script src="scripts/directives/pieceBar.js"></script>
 <script src="scripts/directives/pieceMap.js"></script>
 <script src="scripts/directives/chart.js"></script>
+<script src="scripts/directives/indeterminate.js"></script>
 <script src="scripts/directives/placeholder.js"></script>
 <script src="scripts/directives/setting.js"></script>
 <script src="scripts/directives/settingDialog.js"></script>
 <script src="scripts/directives/tooltip.js"></script>
+<script src="scripts/directives/validUrls.js"></script>
+<script src="scripts/directives/blobDownload.js"></script>
 <script src="scripts/filters/dateDuration.js"></script>
 <script src="scripts/filters/fileOrderBy.js"></script>
 <script src="scripts/filters/longDate.js"></script>
 <script src="scripts/filters/peerOrderBy.js"></script>
 <script src="scripts/filters/percent.js"></script>
+<script src="scripts/filters/reverse.js"></script>
 <script src="scripts/filters/taskOrderBy.js"></script>
 <script src="scripts/filters/taskStatus.js"></script>
 <script src="scripts/filters/volume.js"></script>
-<script src="scripts/services/ariaNgCommonService.js"></script>
-<script src="scripts/services/ariaNgFileService.js"></script>
+<script src="scripts/services/ariaNgAssetsCacheService.js"></script>
 <script src="scripts/services/ariaNgLanguageLoader.js"></script>
-<script src="scripts/services/ariaNgMonitorService.js"></script>
+<script src="scripts/services/ariaNgCommonService.js"></script>
 <script src="scripts/services/ariaNgNotificationService.js"></script>
-<script src="scripts/services/ariaNgSettingService.js"></script>
-<script src="scripts/services/ariaNgTitleService.js"></script>
+<script src="scripts/services/ariaNgLocalizationService.js"></script>
 <script src="scripts/services/ariaNgLogService.js"></script>
+<script src="scripts/services/ariaNgStorageService.js"></script>
+<script src="scripts/services/ariaNgFileService.js"></script>
+<script src="scripts/services/ariaNgSettingService.js"></script>
+<script src="scripts/services/ariaNgMonitorService.js"></script>
+<script src="scripts/services/ariaNgTitleService.js"></script>
 <script src="scripts/services/aria2HttpRpcService.js"></script>
 <script src="scripts/services/aria2WebSocketRpcService.js"></script>
 <script src="scripts/services/aria2RpcService.js"></script>
@@ -390,5 +414,6 @@
 <script src="scripts/services/aria2SettingService.js"></script>
 <script src="scripts/views/templates.js"></script>
 <!-- endbuild -->
+<!-- AriaNg-Bundle:languages -->
 </body>
 </html>

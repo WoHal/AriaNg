@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('aria2HttpRpcService', ['$http', 'base64', 'ariaNgSettingService', 'ariaNgLogService', function ($http, base64, ariaNgSettingService, ariaNgLogService) {
+    angular.module('ariaNg').factory('aria2HttpRpcService', ['$http', 'ariaNgCommonService', 'ariaNgSettingService', 'ariaNgLogService', function ($http, ariaNgCommonService, ariaNgSettingService, ariaNgLogService) {
         var rpcUrl = ariaNgSettingService.getCurrentRpcUrl();
         var method = ariaNgSettingService.getCurrentRpcHttpMethod();
 
@@ -29,7 +29,7 @@
 
                 if (angular.isObject(value) || angular.isArray(value)) {
                     value = angular.toJson(value);
-                    value = base64.encode(value);
+                    value = ariaNgCommonService.base64Encode(value);
                     value = encodeURIComponent(value);
                 }
 
@@ -66,15 +66,22 @@
                     requestContext.url = getUrlWithQueryString(requestContext.url, context.requestBody);
                 }
 
-                ariaNgLogService.debug('[aria2HttpRpcService.request] request start', requestContext);
+                ariaNgLogService.debug('[aria2HttpRpcService.request] ' + (context && context.requestBody && context.requestBody.method ? context.requestBody.method + ' ' : '') + 'request start', requestContext);
 
                 return $http(requestContext).then(function onSuccess(response) {
                     var data = response.data;
 
-                    ariaNgLogService.debug('[aria2HttpRpcService.request] response success', data);
+                    ariaNgLogService.debug('[aria2HttpRpcService.request] ' + (context && context.requestBody && context.requestBody.method ? context.requestBody.method + ' ' : '') + 'response success', response);
 
                     if (!data) {
                         return;
+                    }
+
+                    if (context.connectionSuccessCallback) {
+                        context.connectionSuccessCallback({
+                            rpcUrl: rpcUrl,
+                            method: method
+                        });
                     }
 
                     if (context.successCallback) {
@@ -83,7 +90,7 @@
                 }).catch(function onError(response) {
                     var data = response.data;
 
-                    ariaNgLogService.debug('[aria2HttpRpcService.request] response error', data);
+                    ariaNgLogService.debug('[aria2HttpRpcService.request] ' + (context && context.requestBody && context.requestBody.method ? context.requestBody.method + ' ' : '') + 'response error', response);
 
                     if (!data) {
                         data = {
@@ -94,6 +101,13 @@
                                 innerError: true
                             }
                         };
+
+                        if (context.connectionFailedCallback) {
+                            context.connectionFailedCallback({
+                                rpcUrl: rpcUrl,
+                                method: method
+                            });
+                        }
                     }
 
                     if (context.errorCallback) {

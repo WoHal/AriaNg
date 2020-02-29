@@ -1,14 +1,16 @@
 (function () {
     'use strict';
 
-    angular.module('ariaNg').factory('aria2RpcService', ['$q', 'aria2RpcConstants', 'aria2RpcErrors', 'ariaNgCommonService', 'ariaNgSettingService', 'ariaNgLogService', 'aria2HttpRpcService', 'aria2WebSocketRpcService', function ($q, aria2RpcConstants, aria2RpcErrors, ariaNgCommonService, ariaNgSettingService, ariaNgLogService, aria2HttpRpcService, aria2WebSocketRpcService) {
+    angular.module('ariaNg').factory('aria2RpcService', ['$q', 'aria2RpcConstants', 'aria2RpcErrors', 'aria2AllOptions', 'ariaNgCommonService', 'ariaNgLocalizationService', 'ariaNgLogService', 'ariaNgSettingService', 'aria2HttpRpcService', 'aria2WebSocketRpcService', function ($q, aria2RpcConstants, aria2RpcErrors, aria2AllOptions, ariaNgCommonService, ariaNgLocalizationService, ariaNgLogService, ariaNgSettingService, aria2HttpRpcService, aria2WebSocketRpcService) {
         var rpcImplementService = ariaNgSettingService.isCurrentRpcUseWebSocket() ? aria2WebSocketRpcService : aria2HttpRpcService;
         var isConnected = false;
         var secret = ariaNgSettingService.getCurrentRpcSecret();
 
         var onFirstSuccessCallbacks = [];
-        var onConnectSuccessCallbacks = [];
-        var onConnectErrorCallbacks = [];
+        var onOperationSuccessCallbacks = [];
+        var onOperationErrorCallbacks = [];
+        var onConnectionSuccessCallbacks = [];
+        var onConnectionFailedCallbacks = [];
         var onDownloadStartCallbacks = [];
         var onDownloadPauseCallbacks = [];
         var onDownloadStopCallbacks = [];
@@ -45,6 +47,8 @@
             var invokeContext = {
                 uniqueId: uniqueId,
                 requestBody: requestBody,
+                connectionSuccessCallback: requestContext.connectionSuccessCallback,
+                connectionFailedCallback: requestContext.connectionFailedCallback,
                 successCallback: requestContext.successCallback,
                 errorCallback: requestContext.errorCallback
             };
@@ -67,14 +71,14 @@
             });
         };
 
-        var fireCustomEvent = function (callbacks) {
+        var fireCustomEvent = function (callbacks, context) {
             if (!angular.isArray(callbacks) || callbacks.length < 1) {
                 return;
             }
 
             for (var i = 0; i < callbacks.length; i++) {
                 var callback = callbacks[i];
-                callback();
+                callback(context);
             }
         };
 
@@ -89,8 +93,8 @@
                 contexts[i].callback = function (response) {
                     results.push(response);
 
-                    hasSuccess = hasSuccess | response.success;
-                    hasError = hasError | !response.success;
+                    hasSuccess = hasSuccess || response.success;
+                    hasError = hasError || !response.success;
                 };
 
                 promises.push(methodFunc(contexts[i]));
@@ -115,10 +119,10 @@
             ariaNgLogService.error('[aria2RpcService.processError] ' + error.message, error);
 
             if (aria2RpcErrors[error.message] && aria2RpcErrors[error.message].tipTextKey) {
-                ariaNgCommonService.showError(aria2RpcErrors[error.message].tipTextKey);
+                ariaNgLocalizationService.showError(aria2RpcErrors[error.message].tipTextKey);
                 return true;
             } else {
-                ariaNgCommonService.showError(error.message);
+                ariaNgLocalizationService.showError(error.message);
                 return true;
             }
         };
@@ -130,6 +134,14 @@
 
             var context = {
                 methodName: (!isSystemMethod ? getAria2MethodFullName(methodName) : methodName)
+            };
+
+            context.connectionSuccessCallback = function () {
+                fireCustomEvent(onConnectionSuccessCallbacks);
+            };
+
+            context.connectionFailedCallback = function () {
+                fireCustomEvent(onConnectionFailedCallbacks);
             };
 
             if (secret && !isSystemMethod) {
@@ -149,11 +161,14 @@
                         });
                     }
 
-                    fireCustomEvent(onConnectSuccessCallbacks);
+                    fireCustomEvent(onOperationSuccessCallbacks);
 
                     if (!isConnected) {
                         isConnected = true;
-                        fireCustomEvent(onFirstSuccessCallbacks);
+                        var firstSuccessContext = {
+                            rpcName: ariaNgSettingService.getCurrentRpcDisplayName()
+                        };
+                        fireCustomEvent(onFirstSuccessCallbacks, firstSuccessContext);
                     }
                 };
 
@@ -174,7 +189,7 @@
                         });
                     }
 
-                    fireCustomEvent(onConnectErrorCallbacks);
+                    fireCustomEvent(onOperationErrorCallbacks);
                 };
             }
 
@@ -191,6 +206,57 @@
             }
 
             return context;
+        };
+
+        var buildRequestOptions = function (originalOptions, context) {
+            var options = angular.copy(originalOptions);
+
+            for (var optionName in options) {
+                if (!options.hasOwnProperty(optionName)) {
+                    continue;
+                }
+
+                if (isOptionSubmitArray(options, optionName)) {
+                    options[optionName] = buildArrayOption(options[optionName], aria2AllOptions[optionName]);
+                }
+            }
+
+            if (context && context.pauseOnAdded) {
+                options.pause = 'true';
+            }
+
+            return options;
+        };
+
+        var isOptionSubmitArray = function (options, optionName) {
+            if (!options[optionName] || !angular.isString(options[optionName])) {
+                return false;
+            }
+
+            if (!aria2AllOptions[optionName] || aria2AllOptions[optionName].submitFormat !== 'array') {
+                return false;
+            }
+
+            return true;
+        };
+
+        var buildArrayOption = function (option, optionSetting) {
+            var items = option.split(optionSetting.split);
+            var result = [];
+
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+
+                if (!item) {
+                    continue;
+                }
+
+                item = item.replace('\r', '');
+
+                result.push(item);
+            }
+
+            return result;
         };
 
         (function () {
@@ -214,7 +280,9 @@
                     'numSeeders',
                     'seeder',
                     'status',
-                    'errorCode'
+                    'errorCode',
+                    'verifiedLength',
+                    'verifyIntegrityPending'
                 ];
             },
             getFullTaskParams: function () {
@@ -222,16 +290,13 @@
 
                 requestParams.push('files');
                 requestParams.push('bittorrent');
+                requestParams.push('infoHash');
 
                 return requestParams;
             },
             addUri: function (context, returnContextOnly) {
                 var urls = context.task.urls;
-                var options = angular.copy(context.task.options);
-
-                if (context.pauseOnAdded) {
-                    options.pause = 'true';
-                }
+                var options = buildRequestOptions(context.task.options, context);
 
                 return invoke(buildRequestContext('addUri', context, urls, options), !!returnContextOnly);
             },
@@ -252,21 +317,13 @@
             },
             addTorrent: function (context, returnContextOnly) {
                 var content = context.task.content;
-                var options = angular.copy(context.task.options);
-
-                if (context.pauseOnAdded) {
-                    options.pause = 'true';
-                }
+                var options = buildRequestOptions(context.task.options, context);
 
                 return invoke(buildRequestContext('addTorrent', context, content, [], options), !!returnContextOnly);
             },
             addMetalink: function (context, returnContextOnly) {
                 var content = context.task.content;
-                var options = angular.copy(context.task.options);
-
-                if (context.pauseOnAdded) {
-                    options.pause = 'true';
-                }
+                var options = buildRequestOptions(context.task.options, context);
 
                 return invoke(buildRequestContext('addMetalink', context, content, [], options), !!returnContextOnly);
             },
@@ -374,13 +431,15 @@
                 return invoke(buildRequestContext('getOption', context, context.gid), !!returnContextOnly);
             },
             changeOption: function (context, returnContextOnly) {
-                return invoke(buildRequestContext('changeOption', context, context.gid, context.options), !!returnContextOnly);
+                var options = buildRequestOptions(context.options, context);
+                return invoke(buildRequestContext('changeOption', context, context.gid, options), !!returnContextOnly);
             },
             getGlobalOption: function (context, returnContextOnly) {
                 return invoke(buildRequestContext('getGlobalOption', context), !!returnContextOnly);
             },
             changeGlobalOption: function (context, returnContextOnly) {
-                return invoke(buildRequestContext('changeGlobalOption', context, context.options), !!returnContextOnly);
+                var options = buildRequestOptions(context.options, context);
+                return invoke(buildRequestContext('changeGlobalOption', context, options), !!returnContextOnly);
             },
             getGlobalStat: function (context, returnContextOnly) {
                 return invoke(buildRequestContext('getGlobalStat', context), !!returnContextOnly);
@@ -427,11 +486,17 @@
             onFirstSuccess: function (context) {
                 onFirstSuccessCallbacks.push(context.callback);
             },
-            onConnectSuccess: function (context) {
-                onConnectSuccessCallbacks.push(context.callback);
+            onOperationSuccess: function (context) {
+                onOperationSuccessCallbacks.push(context.callback);
             },
-            onConnectError: function (context) {
-                onConnectErrorCallbacks.push(context.callback);
+            onOperationError: function (context) {
+                onOperationErrorCallbacks.push(context.callback);
+            },
+            onConnectionSuccess: function (context) {
+                onConnectionSuccessCallbacks.push(context.callback);
+            },
+            onConnectionFailed: function (context) {
+                onConnectionFailedCallbacks.push(context.callback);
             },
             onDownloadStart: function (context) {
                 onDownloadStartCallbacks.push(context.callback);
