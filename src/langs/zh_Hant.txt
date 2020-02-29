@@ -54,6 +54,7 @@ Filters=篩選器
 Download=下載
 Upload=上傳
 Downloading=正在下載
+Saved Filename=保存的文件名
 Pending Verification=等待驗證
 Verifying=正在驗證
 Seeding=正在做種
