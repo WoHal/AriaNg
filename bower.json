@@ -49,7 +49,8 @@
     "angular-busy": "^4.1.4",
     "angular-promise-buttons": "^0.1.20",
     "angular-dragula": "^1.2.8",
-    "ngSweetAlert": "^1.1.2"
+    "ngSweetAlert": "^1.1.2",
+    "m3u8-parser": "^4.4.2"
   },
   "resolutions": {
     "angular": "1.6.4"
