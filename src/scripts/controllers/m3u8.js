@@ -20,11 +20,20 @@
             });
         })();
 
-        $scope.startM3U8Download = function (pauseOnAdded) {
-            var tasks = [];
-            var url = $scope.context.urls.trim();
-            var a = document.createElement('a');
-            a.href = url;
+        // var aElement;
+        // function getDownloadURL() {
+        //     if (aElement) {
+        //         return aElement;
+        //     }
+        //     aElement = document.createElement('a');
+        //     aElement.href = $scope.context.urls.trim();
+        //     return aElement;
+        // }
+        // function getPath(pathname, uri) {
+        //     var isAbsolutePath = uri.startsWith('/');
+        //     return isAbsolutePath ? uri : pathname.replace(/[^/.]+\.ts/i, uri);
+        // }
+        function getSegments(url, successCb) {
             $.ajax({
                 type: 'GET',
                 dataType: 'text',
@@ -34,35 +43,48 @@
                     parser.push(res);
                     parser.end();
 
-                    var playlists = parser.manifest.playlists || [];
-                    playlists.forEach(function(playlist) {
-                        $.ajax({
-                            type: 'GET',
-                            dataType: 'text',
-                            url: a.origin + playlist.uri,
-                            success: function(list) {
-                                parser = new window.m3u8Parser.Parser();
-                                parser.push(list);
-                                parser.end();
+                    var playlist = parser.manifest.playlists && parser.manifest.playlists[0];
+                    var segments = parser.manifest.segments;
+                    parser = null;
 
-                                var segments = parser.manifest.segments;
-                                parser = null;
-                                var tsFiles = [];
-                                segments.forEach(function(segment) {
-                                    tsFiles.push(segment.uri.match(/\/([^/.]+\.ts)$/)[1]);
-                                    tasks.push({
-                                        urls: [a.origin + segment.uri],
-                                        options: {
-                                            dir: $scope.context.globalOptions.dir + '/' + $scope.context.filename
-                                        }
-                                    });
-                                });
-
-                                aria2TaskService.newUriTasks(tasks, pauseOnAdded);
-                            }
-                        });
-                    });
+                    if (playlist) {
+                        getSegments(new URL(playlist.uri, url).href, successCb);
+                    } else if (segments.length > 0) {
+                        successCb(url, segments);
+                    }
                 }
+            });
+        }
+
+        $scope.startM3U8Download = function (pauseOnAdded) {
+            var tasks = [];
+            getSegments($scope.context.urls.trim(), function(url, segments) {
+                var tsFiles = [];
+                segments.forEach(function(segment) {
+                    var tsUrl = new URL(segment.uri, url).href;
+                    tsFiles.push('file ' + tsUrl.match(/\/([^/.]+\.ts)$/)[1]);
+                    tasks.push({
+                        urls: [tsUrl],
+                        options: {
+                            dir: $scope.context.globalOptions.dir + '/' + $scope.context.filename
+                        }
+                    });
+                });
+
+                $.ajax({
+                    type: 'POST',
+                    url: 'http://localhost:9001/saveFile',
+                    contentType: 'application/json',
+                    data: JSON.stringify([{
+                        path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/playlist.txt',
+                        content: tsFiles.join('\n')
+                    }, {
+                        path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/convert.sh',
+                        content: 'ffmpeg -f concat -safe 0 -i playlist.txt -c copy index.mp4 && rm -f *.ts'
+                    }])
+                });
+
+                aria2TaskService.newUriTasks(tasks, pauseOnAdded);
             });
         };
 

@@ -3,9 +3,14 @@ var gulpLoadPlugins = require('gulp-load-plugins');
 var browserSync = require('browser-sync');
 var del = require('del');
 var fs = require('fs');
+var path = require('path');
 var git = require('git-rev-sync');
 var tryFn = require('nice-try');
 var saveLicense = require('uglify-save-license');
+var connect = require('gulp-connect');
+var express = require('express');
+var cors = require('cors');
+var mkdirp = require('mkdirp');
 
 var $ = gulpLoadPlugins();
 var reload = browserSync.reload;
@@ -199,6 +204,36 @@ gulp.task('build', $.sequence('lint', 'process-fonts', 'process-langs', 'process
 
 gulp.task('build-bundle', $.sequence('lint', 'process-assets-bundle', 'process-tiny-extras', 'info'));
 
+gulp.task('connect', function() {
+    var app = express();
+    const bodyParser = require('body-parser');
+    app.use(cors());
+    app.use(bodyParser.urlencoded({ extended: true }));
+    app.use(bodyParser.json());
+    app.use(bodyParser.raw());
+    app.post('/saveFile', function(req, res) {
+        var requestBody = req.body;
+        requestBody.forEach(function(item) {
+            mkdirp(path.dirname(item.path)).then(function() {
+                fs.writeFile(item.path, item.content, {
+                    encoding: 'utf8'
+                }, function(err) {
+                    if (err) {
+                        throw Error(err);
+                    }
+                });
+            });
+        });
+        res.sendStatus(200);
+    });
+    connect.server({
+        port: 9001,
+        middleware: function() {
+            return [app];
+        }
+    });
+});
+
 gulp.task('serve', ['prepare-styles', 'prepare-scripts', 'prepare-fonts'], function () {
     browserSync({
         notify: false,
@@ -224,6 +259,8 @@ gulp.task('serve', ['prepare-styles', 'prepare-scripts', 'prepare-fonts'], funct
     gulp.watch('src/styles/**/*.css', ['prepare-styles']);
     gulp.watch('src/scripts/**/*.js', ['prepare-scripts']);
     gulp.watch('src/fonts/**/*', ['prepare-fonts']);
+
+    gulp.start('connect');
 });
 
 gulp.task('serve:dist', function () {
@@ -234,6 +271,7 @@ gulp.task('serve:dist', function () {
             baseDir: ['dist']
         }
     });
+    gulp.start('connect');
 });
 
 gulp.task('default', ['clean'], function () {
