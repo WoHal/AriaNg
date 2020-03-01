@@ -20,19 +20,6 @@
             });
         })();
 
-        // var aElement;
-        // function getDownloadURL() {
-        //     if (aElement) {
-        //         return aElement;
-        //     }
-        //     aElement = document.createElement('a');
-        //     aElement.href = $scope.context.urls.trim();
-        //     return aElement;
-        // }
-        // function getPath(pathname, uri) {
-        //     var isAbsolutePath = uri.startsWith('/');
-        //     return isAbsolutePath ? uri : pathname.replace(/[^/.]+\.ts/i, uri);
-        // }
         function getSegments(url, successCb) {
             $.ajax({
                 type: 'GET',
@@ -80,7 +67,7 @@
                         content: tsFiles.join('\n')
                     }, {
                         path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/convert.sh',
-                        content: 'ffmpeg -f concat -safe 0 -i playlist.txt -c copy index.mp4 && rm -f *.ts'
+                        content: 'ffmpeg -f concat -safe 0 -i playlist.txt -c copy index.mp4'
                     }])
                 });
 
