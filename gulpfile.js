@@ -228,6 +228,7 @@ gulp.task('connect', function() {
     });
     connect.server({
         port: 9001,
+        root: 'dist',
         middleware: function() {
             return [app];
         }
@@ -271,9 +272,8 @@ gulp.task('serve:dist', function () {
             baseDir: ['dist']
         }
     });
-    gulp.start('connect');
 });
 
-gulp.task('default', ['clean'], function () {
-    gulp.start('build');
+gulp.task('default', ['clean', 'build'], function () {
+    gulp.start('connect');
 });

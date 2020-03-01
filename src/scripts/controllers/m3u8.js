@@ -73,7 +73,7 @@
 
                 $.ajax({
                     type: 'POST',
-                    url: 'http://localhost:9001/saveFile',
+                    url: 'saveFile',
                     contentType: 'application/json',
                     data: JSON.stringify([{
                         path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/playlist.txt',
