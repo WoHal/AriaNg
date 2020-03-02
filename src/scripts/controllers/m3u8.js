@@ -47,9 +47,11 @@
             var tasks = [];
             getSegments($scope.context.urls.trim(), function(url, segments) {
                 var tsFiles = [];
+                var tsDownloadUrl = [];
                 segments.forEach(function(segment) {
                     var tsUrl = new URL(segment.uri, url).href;
                     tsFiles.push('file ' + tsUrl.match(/\/([^/.]+\.ts)$/)[1]);
+                    tsDownloadUrl.push('wget ' + tsUrl);
                     tasks.push({
                         urls: [tsUrl],
                         options: {
@@ -65,6 +67,9 @@
                     data: JSON.stringify([{
                         path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/playlist.txt',
                         content: tsFiles.join('\n')
+                    }, {
+                        path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/downloadList.txt',
+                        content: tsDownloadUrl.join('\n')
                     }, {
                         path: $scope.context.globalOptions.dir + '/' + $scope.context.filename + '/convert.sh',
                         content: 'ffmpeg -f concat -safe 0 -i playlist.txt -c copy index.mp4'
